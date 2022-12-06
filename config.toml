@@ -1,0 +1,20 @@
+baseURL = 'https://blog.atomage.cn'
+languageCode = 'zh-cn'
+title = 'ZhongsJie'
+theme = 'ananke'
+
+DefaultContentLanguage = "en"
+enableRobotsTXT = true
+hasCJKLanguage = true
+summaryLength = 300
+
+[params]
+
+commentoEnable = true
+ananke_socials = [
+  {name = "github", url = "https://github.com/ZhongsJie96"},
+]
+
+
+
+
