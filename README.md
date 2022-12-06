@@ -42,6 +42,7 @@ $ hugo help
   hugo new post/new-content.md     #新建一篇文章
   hugo new site mysite             #新建一个称为mysite的站点
   hugo server --buildExpired       #启动服务器并包括已过期的文章
+  hugo -e production               #构建
 ```
 
 ### New Post

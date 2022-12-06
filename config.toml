@@ -3,6 +3,9 @@ languageCode = 'zh-cn'
 title = 'ZhongsJie'
 theme = 'ananke'
 
+# modify dir
+publishDir = "docs"
+
 DefaultContentLanguage = "en"
 enableRobotsTXT = true
 hasCJKLanguage = true
@@ -13,7 +16,7 @@ summaryLength = 300
 ananke_socials = [
   {name = "github", url = "https://github.com/ZhongsJie96"},
 ]
-
-
-
-
+show_reading_time = true
+background_color_class = "bg-black"
+featured_image = "/images/gohugo-default-sample-hero-image.jpg"
+recent_posts_number = 8
