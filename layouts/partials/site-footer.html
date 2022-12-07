@@ -1,0 +1,10 @@
+<footer class="{{ .Site.Params.background_color_class | default " bg-black" }} bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="{{ .Site.BaseURL }}">
+      &copy; {{ with .Site.Copyright | default .Site.Title }} {{ . | safeHTML }}  2022-{{ now.Format "2006"}} {{ end }}
+    </a>
+    <div>{{ partial "social-follow.html" . }}</div>
+    <a href="https://beian.miit.gov.cn/" class="link db f6 pa2 br3 bg-mid-gray white dim w4 tc"> 蜀ICP备2022025742号 </a>
+    {{ template "_internal/google_analytics.html" . }}
+  </div>
+</footer>
