@@ -5,6 +5,16 @@
     <link>https://blogs.atomage.cn/posts/</link>
     <description>Recent content in 📎Posts on Atomage&#39;s Blog</description>
     <generator>Hugo -- gohugo.io</generator>
-    <language>zh-cn</language><atom:link href="https://blogs.atomage.cn/posts/index.xml" rel="self" type="application/rss+xml" />
+    <language>zh-cn</language>
+    <lastBuildDate>Fri, 09 Dec 2022 17:36:50 +0800</lastBuildDate><atom:link href="https://blogs.atomage.cn/posts/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Nginx指南</title>
+      <link>https://blogs.atomage.cn/posts/2022-12-09-nginx-learning/</link>
+      <pubDate>Fri, 09 Dec 2022 17:36:50 +0800</pubDate>
+      
+      <guid>https://blogs.atomage.cn/posts/2022-12-09-nginx-learning/</guid>
+      <description>Nginx 介绍# “Nginx 是一款轻量级的 HTTP 服务器，采用事件驱动的异步非阻塞处理方式框架，这让其具有极好的 IO 性能，时常用于服务端的反向代理和负载均衡。” 正向代理 正向代理“代理”的是客户端，而且客户端是知道目标的，而目标是不知道客户端是通过VPN访问的。 反向代理 反向代理“代理”的是服务器端，而且这一个过程对于客户端而言是透明的。 Nginx的Master-Worker模式# Master 读取并配置nginx.conf, 管理Worker进程 Worker 维护一个线程（避免线程切换），处理连接和请求；注意Worker进程的个数由配置文件决定，一般和CPU个数相关（有利于进程切换），配置几个就有几个Worker进程。 Nginx热部署#</description>
+    </item>
+    
   </channel>
 </rss>
