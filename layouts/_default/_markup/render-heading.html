@@ -1,0 +1,3 @@
+<h{{ .Level }} id="{{ .Anchor | safeURL }}">
+    {{ .Text | safeHTML }}<a class="hash-link" href="#{{ .Anchor | safeURL }}" title="Direct link to heading">#</a>
+</h{{ .Level }}>

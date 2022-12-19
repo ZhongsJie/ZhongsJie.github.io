@@ -2,17 +2,28 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://blog.atomage.cn/posts/2022-12-07-init-hugo/</loc>
-    <lastmod>2022-12-07T00:15:22+08:00</lastmod>
+    <loc>https://blogs.atomage.cn/archives/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
   </url><url>
-    <loc>https://blog.atomage.cn/posts/</loc>
-    <lastmod>2022-12-07T00:15:22+08:00</lastmod>
+    <loc>https://blogs.atomage.cn/posts/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
   </url><url>
-    <loc>https://blog.atomage.cn/</loc>
-    <lastmod>2022-12-07T00:15:22+08:00</lastmod>
+    <loc>https://blogs.atomage.cn/about/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
   </url><url>
-    <loc>https://blog.atomage.cn/categories/</loc>
+    <loc>https://blogs.atomage.cn/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
   </url><url>
-    <loc>https://blog.atomage.cn/tags/</loc>
+    <loc>https://blogs.atomage.cn/categories/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
+    <loc>https://blogs.atomage.cn/tags/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
   </url>
 </urlset>
