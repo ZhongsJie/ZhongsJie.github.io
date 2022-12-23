@@ -2,12 +2,42 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://blogs.atomage.cn/posts/</loc>
-    <lastmod>2022-12-09T17:36:50+08:00</lastmod>
+    <loc>https://blogs.atomage.cn/</loc>
+    <lastmod>2022-12-23T12:36:09+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>https://blogs.atomage.cn/</loc>
+    <loc>https://blogs.atomage.cn/categories/</loc>
+    <lastmod>2022-12-23T12:36:09+08:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
+    <loc>https://blogs.atomage.cn/posts/2022-12-23-kubelet-volumemanager-mechanism-process-analysis/</loc>
+    <lastmod>2022-12-23T12:36:09+08:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
+    <loc>https://blogs.atomage.cn/tags/kubernetes/</loc>
+    <lastmod>2022-12-23T12:36:09+08:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
+    <loc>https://blogs.atomage.cn/categories/kubernetes/</loc>
+    <lastmod>2022-12-23T12:36:09+08:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
+    <loc>https://blogs.atomage.cn/tags/</loc>
+    <lastmod>2022-12-23T12:36:09+08:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
+    <loc>https://blogs.atomage.cn/tags/volume/</loc>
+    <lastmod>2022-12-23T12:36:09+08:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
+    <loc>https://blogs.atomage.cn/posts/</loc>
     <lastmod>2022-12-09T17:36:50+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -27,20 +57,11 @@
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>https://blogs.atomage.cn/tags/</loc>
-    <lastmod>2022-12-09T17:36:50+08:00</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url><url>
     <loc>https://blogs.atomage.cn/archives/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
     <loc>https://blogs.atomage.cn/about/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url><url>
-    <loc>https://blogs.atomage.cn/categories/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>

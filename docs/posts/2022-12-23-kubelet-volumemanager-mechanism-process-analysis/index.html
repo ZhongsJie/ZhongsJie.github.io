@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    
+    <title>Kubelet VolumeManager机制流程分析 | Atomage&#39;s Blog</title>
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="description" content="Kubelet VolumeManager机制流程分析# Kubelet Volume相关逻辑主要在VolumeManager模块 Mount 阶段则由对应节点的 kubelet 中的 volume manager 处理。 volume manager 获取 node.Status.VolumesAttached 属性值，发现 volume 已被标记为 attached, 就会进行 mount 操作 k8s中涉及存储的组件主要有：attach/detach controller、pv controller、volume manager、volume plugins、scheduler。每个组件分工明确： attach/detach controller：负责对 volume 进行 attach/detach persistent volume controller：负责处理 pv/pvc 对象，包括 pv 的 provision/delete kubelet volume manager：主要负责对 volume 进行 mount/unmount volume plugins：包含 k8s 原生的和各厂商的的存储插件 挂载流程# 第一步是在准备 volume（">
+    <meta name="generator" content="Hugo 0.107.0">
+    
+    
+    
+    
+      <meta name="robots" content="noindex, nofollow">
+    
+
+    
+<link rel="stylesheet" href="/ananke/css/main.min.css" >
+
+
+
+    
+    
+    
+      
+
+    
+
+    
+    
+    <meta property="og:title" content="Kubelet VolumeManager机制流程分析" />
+<meta property="og:description" content="Kubelet VolumeManager机制流程分析# Kubelet Volume相关逻辑主要在VolumeManager模块 Mount 阶段则由对应节点的 kubelet 中的 volume manager 处理。 volume manager 获取 node.Status.VolumesAttached 属性值，发现 volume 已被标记为 attached, 就会进行 mount 操作 k8s中涉及存储的组件主要有：attach/detach controller、pv controller、volume manager、volume plugins、scheduler。每个组件分工明确： attach/detach controller：负责对 volume 进行 attach/detach persistent volume controller：负责处理 pv/pvc 对象，包括 pv 的 provision/delete kubelet volume manager：主要负责对 volume 进行 mount/unmount volume plugins：包含 k8s 原生的和各厂商的的存储插件 挂载流程# 第一步是在准备 volume（" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://blogs.atomage.cn/posts/2022-12-23-kubelet-volumemanager-mechanism-process-analysis/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2022-12-23T12:36:09+08:00" />
+<meta property="article:modified_time" content="2022-12-23T12:36:09+08:00" />
+
+<meta itemprop="name" content="Kubelet VolumeManager机制流程分析">
+<meta itemprop="description" content="Kubelet VolumeManager机制流程分析# Kubelet Volume相关逻辑主要在VolumeManager模块 Mount 阶段则由对应节点的 kubelet 中的 volume manager 处理。 volume manager 获取 node.Status.VolumesAttached 属性值，发现 volume 已被标记为 attached, 就会进行 mount 操作 k8s中涉及存储的组件主要有：attach/detach controller、pv controller、volume manager、volume plugins、scheduler。每个组件分工明确： attach/detach controller：负责对 volume 进行 attach/detach persistent volume controller：负责处理 pv/pvc 对象，包括 pv 的 provision/delete kubelet volume manager：主要负责对 volume 进行 mount/unmount volume plugins：包含 k8s 原生的和各厂商的的存储插件 挂载流程# 第一步是在准备 volume（"><meta itemprop="datePublished" content="2022-12-23T12:36:09+08:00" />
+<meta itemprop="dateModified" content="2022-12-23T12:36:09+08:00" />
+<meta itemprop="wordCount" content="2091">
+<meta itemprop="keywords" content="Kubernetes,Volume," /><meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Kubelet VolumeManager机制流程分析"/>
+<meta name="twitter:description" content="Kubelet VolumeManager机制流程分析# Kubelet Volume相关逻辑主要在VolumeManager模块 Mount 阶段则由对应节点的 kubelet 中的 volume manager 处理。 volume manager 获取 node.Status.VolumesAttached 属性值，发现 volume 已被标记为 attached, 就会进行 mount 操作 k8s中涉及存储的组件主要有：attach/detach controller、pv controller、volume manager、volume plugins、scheduler。每个组件分工明确： attach/detach controller：负责对 volume 进行 attach/detach persistent volume controller：负责处理 pv/pvc 对象，包括 pv 的 provision/delete kubelet volume manager：主要负责对 volume 进行 mount/unmount volume plugins：包含 k8s 原生的和各厂商的的存储插件 挂载流程# 第一步是在准备 volume（"/>
+
+	
+  </head>
+
+  <body class="ma0 avenir bg-near-white">
+
+    
+
+
+
+  <header>
+    <div class="bg-black">
+      <nav class="pv3 ph3 ph4-ns" role="navigation">
+  <div class="flex-l justify-between items-center center">
+    <a href="/" class="f3 fw2 hover-white no-underline white-90 dib">
+      
+        Atomage&#39;s Blog
+      
+    </a>
+    <div class="flex-l items-center">
+      
+
+      
+        <ul class="pl0 mr3">
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/archives/" title="⏱️Archives page">
+              ⏱️Archives
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/posts/" title="📎Posts page">
+              📎Posts
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/about/" title="🙋🏻‍♂️About page">
+              🙋🏻‍♂️About
+            </a>
+          </li>
+          
+        </ul>
+      
+      
+<div class="ananke-socials">
+  
+    
+    <a href="https://github.com/ZhongsJie96" target="_blank" rel="noopener" class="github ananke-social-link link-transition stackoverflow link dib z-999 pt3 pt0-l mr1" title="GitHub link" aria-label="follow on GitHub——Opens in a new window">
+      
+        <span class="icon"><svg style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+</span>
+      
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;"/>
+</svg>
+</span></a>
+  
+</div>
+
+    </div>
+  </div>
+</nav>
+
+    </div>
+  </header>
+
+
+
+    <main class="pb7" role="main">
+      
+
+<article class="flex-l flex-wrap justify-between mw8 center ph3">
+  <header class="mt4 w-100">
+    <aside class="instapaper_ignoref b helvetica tracked">
+      
+      📎POSTS
+    </aside>
+    
+
+
+
+
+
+
+
+
+
+
+  <div id="sharing" class="mt3 ananke-socials">
+    
+  </div>
+
+
+    <h1 class="f1 athelas mt3 mb1">Kubelet VolumeManager机制流程分析</h1>
+    
+    <p class="tracked">
+      By <strong>
+        
+        ZhongsJie
+        
+      </strong>
+    </p>
+    
+    
+    <time class="f6 mv4 dib tracked" datetime="2022-12-23T12:36:09+08:00" >December 23, 2022</time>
+
+    
+    
+    <span class="f6 mv4 dib tracked"> - 5 minutes read</span>
+    <span class="f6 mv4 dib tracked"> - 2091 words</span>
+    
+  </header>
+  <div class="nested-copy-line-height lh-copy serif f4 nested-links
+    nested-img mid-gray pr4-l w-100-l"><h2 id="kubelet-volumemanager机制流程分析">
+    Kubelet VolumeManager机制流程分析<a class="hash-link" href="#kubelet-volumemanager%e6%9c%ba%e5%88%b6%e6%b5%81%e7%a8%8b%e5%88%86%e6%9e%90" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>Kubelet Volume相关逻辑主要在VolumeManager模块</p>
+</blockquote>
+<p><img src="/images/2022-12/image-volumemanager.png" alt="VolumeManager"></p>
+<ol>
+<li>Mount 阶段则由对应节点的 kubelet 中的 volume manager 处理。</li>
+<li>volume manager 获取 node.Status.VolumesAttached 属性值，发现 volume 已被标记为 attached, 就会进行 mount 操作</li>
+<li>k8s中涉及存储的组件主要有：attach/detach controller、pv controller、volume manager、volume plugins、scheduler。每个组件分工明确：
+<ul>
+<li><strong>attach/detach controller</strong>：负责对 volume 进行 attach/detach</li>
+<li><strong>persistent volume controller</strong>：负责处理 pv/pvc 对象，包括 pv 的 provision/delete</li>
+<li><strong>kubelet volume manage</strong>r：主要负责对 volume 进行 mount/unmount</li>
+<li><strong>volume plugins</strong>：包含 k8s 原生的和各厂商的的存储插件</li>
+</ul>
+</li>
+</ol>
+<h3 id="挂载流程">
+    挂载流程<a class="hash-link" href="#%e6%8c%82%e8%bd%bd%e6%b5%81%e7%a8%8b" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>第一步是在准备 volume（宿主机目录），第二步才是真正的挂载操作。</p>
+</blockquote>
+<ol>
+<li>k8s 中的 <strong>Volume</strong> 属于 Pod 内部共享资源存储，生命周期和 Pod 相同，与 Container 无关，即使 Pod 上的容器停止或者重启，Volume 不会受到影响，但是如果 Pod 终止，那么这个 Volume 的生命周期也将结束。</li>
+<li>整个挂载流程需要 kube-controller-manager、 kubelet 以及 cri 共同完成，一个完整的流程大致可分为以下 两个步骤：
+<ul>
+<li>1）远程存储挂载至宿主机
+<ul>
+<li>1）Attach
+<ul>
+<li>由 controller 执行，将远程块存储作为一个远程磁盘挂载到宿主机</li>
+</ul>
+</li>
+<li>2）Mount
+<ul>
+<li>由 kubelet 执行，将远程磁盘格式化并挂载到 Volume 对应的宿主机目录</li>
+<li>一般是在 /var/lib/kubelet 目录下</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>2）将宿主机目录挂载至 Pod 中
+<ul>
+<li>由 CRI 执行，将宿主机上的目录挂载到 Pod 中</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>NFS 本身就是文件系统就可以省略 Attach</li>
+</ol>
+<h4 id="远程存储挂载至宿主机">
+    远程存储挂载至宿主机<a class="hash-link" href="#%e8%bf%9c%e7%a8%8b%e5%ad%98%e5%82%a8%e6%8c%82%e8%bd%bd%e8%87%b3%e5%ae%bf%e4%b8%bb%e6%9c%ba" title="Direct link to heading">#</a>
+</h4><blockquote>
+<p>k8s 的 api 就是只有使用 PV 的时候执行该流程</p>
+</blockquote>
+<ol>
+<li>基础阶段
+<ul>
+<li>阶段一：Attach，挂载磁盘</li>
+<li>阶段二：Mount，格式化磁盘并 mount 至宿主机目录</li>
+</ul>
+</li>
+<li>最终的准备好的volume都会放到以下目录
+<ul>
+<li><code>/var/lib/kubelet/pods/&lt;Pod的ID&gt;/volumes/kubernetes.io~&lt;Volume类型&gt;/&lt;Volume名字&gt;</code></li>
+</ul>
+</li>
+</ol>
+<h3 id="volumemanager相关结构体">
+    volumeManager相关结构体<a class="hash-link" href="#volumemanager%e7%9b%b8%e5%85%b3%e7%bb%93%e6%9e%84%e4%bd%93" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">// volumeManager implements the VolumeManager interfacetype 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#a6e22e">volumeManager</span> <span style="color:#66d9ef">struct</span> {  
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// kubeClient is the kube API client 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#a6e22e">kubeClient</span> <span style="color:#a6e22e">clientset</span>.<span style="color:#a6e22e">Interface</span>  
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// 实现初始化好的插件管理对象
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#a6e22e">volumePluginMgr</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">volume</span>.<span style="color:#a6e22e">VolumePluginMgr</span>  
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// 包含了vm想要达成的一个状态：那些卷应该被连接，那个pods会引用这些卷。从 podManager获取数据
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#a6e22e">desiredStateOfWorld</span> <span style="color:#a6e22e">cache</span>.<span style="color:#a6e22e">DesiredStateOfWorld</span>  
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// 包含了实际的vm状态。在  attach,  detach, mount, and unmount  操作的时候记录这些信息
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#a6e22e">actualStateOfWorld</span> <span style="color:#a6e22e">cache</span>.<span style="color:#a6e22e">ActualStateOfWorld</span>  
+</span></span><span style="display:flex;"><span>     
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// 异步执行 attach, detach, mount,unmount操作
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#a6e22e">operationExecutor</span> <span style="color:#a6e22e">operationexecutor</span>.<span style="color:#a6e22e">OperationExecutor</span>  
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// 运行异步定期循环，通过使用operationExecutor 来协调desiredStateOfWorld与actualStateOfWorld
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#a6e22e">reconciler</span> <span style="color:#a6e22e">reconciler</span>.<span style="color:#a6e22e">Reconciler</span>  
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">//  运行异步定期循环，使用 PodManager 填充 desiredStateOfWorld 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#a6e22e">desiredStateOfWorldPopulator</span> <span style="color:#a6e22e">populator</span>.<span style="color:#a6e22e">DesiredStateOfWorldPopulator</span>  
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// csiMigratedPluginManager keeps track of CSI migration status of plugins   
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#a6e22e">csiMigratedPluginManager</span> <span style="color:#a6e22e">csimigration</span>.<span style="color:#a6e22e">PluginManager</span>  
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// intreeToCSITranslator translates in-tree volume specs to CSI   
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#a6e22e">intreeToCSITranslator</span> <span style="color:#a6e22e">csimigration</span>.<span style="color:#a6e22e">InTreeToCSITranslator</span>  
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h4 id="actualstateofworld">
+    actualStateOfWorld<a class="hash-link" href="#actualstateofworld" title="Direct link to heading">#</a>
+</h4><blockquote>
+<p>保存当前node的所有实际挂载状态</p>
+</blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">actualStateOfWorld</span> <span style="color:#66d9ef">struct</span> {
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">nodeName</span> <span style="color:#a6e22e">types</span>.<span style="color:#a6e22e">NodeName</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// 存储所有卷挂载情况
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#a6e22e">attachedVolumes</span> <span style="color:#66d9ef">map</span>[<span style="color:#a6e22e">v1</span>.<span style="color:#a6e22e">UniqueVolumeName</span>]<span style="color:#a6e22e">attachedVolume</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">-</span>&gt; <span style="color:#a6e22e">mountedPods</span> <span style="color:#66d9ef">map</span>[<span style="color:#a6e22e">volumetypes</span>.<span style="color:#a6e22e">UniquePodName</span>]<span style="color:#a6e22e">mountedPod</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h4 id="desiredstateofworld">
+    desiredStateOfWorld<a class="hash-link" href="#desiredstateofworld" title="Direct link to heading">#</a>
+</h4><blockquote>
+<p>期望挂载状态</p>
+</blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">desiredStateOfWorld</span> <span style="color:#66d9ef">struct</span> {  
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// 期望挂载的情况
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#a6e22e">volumesToMount</span> <span style="color:#66d9ef">map</span>[<span style="color:#a6e22e">v1</span>.<span style="color:#a6e22e">UniqueVolumeName</span>]<span style="color:#a6e22e">volumeToMount</span>
+</span></span><span style="display:flex;"><span>	   <span style="color:#f92672">-</span>&gt; <span style="color:#a6e22e">podsToMount</span> <span style="color:#66d9ef">map</span>[<span style="color:#a6e22e">types</span>.<span style="color:#a6e22e">UniquePodName</span>]<span style="color:#a6e22e">podToMount</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h3 id="reconcile">
+    reconcile<a class="hash-link" href="#reconcile" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">rc</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">reconciler</span>) <span style="color:#a6e22e">reconcile</span>() {  
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// Unmounts are triggered before mounts so that a volume that was  
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#75715e">// referenced by a pod that was deleted and is now referenced by another   
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#75715e">// pod is unmounted from the first pod before being mounted to the new  
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#75715e">// pod.   
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#75715e">// 遍历 node 上的 mountedVolume，检查 pod 还在不在，如果 pod 不在了就把对应 volume unmount
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#a6e22e">rc</span>.<span style="color:#a6e22e">unmountVolumes</span>()  
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// Next we mount required volumes. This function could also trigger  
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#75715e">// attach if kubelet is responsible for attaching volumes.   // If underlying PVC was resized while in-use then this function also handles volume   
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#75715e">// resizing.   
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#75715e">// 遍历需要 mount 或者 attach 的 volume，看下是不是真的 mount 或者 attach了，没有就执行 mount 或者 attach.设备需要先 attach，因此 kubelet 这里会一直阻塞，产生一个叫做 VolumeNotAttached 的错误
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#a6e22e">rc</span>.<span style="color:#a6e22e">mountOrAttachVolumes</span>()  
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// Ensure devices that should be detached/unmounted are detached/unmounted.  
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#75715e">// unmountDetachDevices：如果某个设备的多个 volume 都是 unmount 状态那就把该设备 detach 掉
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#a6e22e">rc</span>.<span style="color:#a6e22e">unmountDetachDevices</span>()  
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// After running the above operations if skippedDuringReconstruction is not empty  
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#75715e">// then ensure that all volumes which were discovered and skipped during reconstruction   
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#75715e">// are added to actualStateOfWorld in uncertain state.   
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#66d9ef">if</span> len(<span style="color:#a6e22e">rc</span>.<span style="color:#a6e22e">skippedDuringReconstruction</span>) &gt; <span style="color:#ae81ff">0</span> {  
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">rc</span>.<span style="color:#a6e22e">processReconstructedVolumes</span>()  
+</span></span><span style="display:flex;"><span>   }  
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h3 id="desiredstateofworldpopulator">
+    desiredStateOfWorldPopulator<a class="hash-link" href="#desiredstateofworldpopulator" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p> 运行异步定期循环，使用 PodManager 填充 desiredStateOfWorld</p>
+</blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#a6e22e">wait</span>.<span style="color:#a6e22e">PollUntil</span>(<span style="color:#a6e22e">dswp</span>.<span style="color:#a6e22e">loopSleepDuration</span>, <span style="color:#66d9ef">func</span>() (<span style="color:#66d9ef">bool</span>, <span style="color:#66d9ef">error</span>) {  
+</span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">done</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">sourcesReady</span>.<span style="color:#a6e22e">AllReady</span>()  
+</span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">dswp</span>.<span style="color:#a6e22e">populatorLoop</span>()  
+</span></span><span style="display:flex;"><span>	   <span style="color:#f92672">-</span>&gt; {
+</span></span><span style="display:flex;"><span>			   <span style="color:#a6e22e">dswp</span>.<span style="color:#a6e22e">findAndAddNewPods</span>()
+</span></span><span style="display:flex;"><span>			   <span style="color:#a6e22e">dswp</span>.<span style="color:#a6e22e">findAndRemoveDeletedPods</span>()
+</span></span><span style="display:flex;"><span>			}
+</span></span><span style="display:flex;"><span>   <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">done</span>, <span style="color:#66d9ef">nil</span>  
+</span></span><span style="display:flex;"><span>}, <span style="color:#a6e22e">stopCh</span>)
+</span></span></code></pre></div><h4 id="findandaddnewpods">
+    findAndAddNewPods<a class="hash-link" href="#findandaddnewpods" title="Direct link to heading">#</a>
+</h4><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">dswp</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">desiredStateOfWorldPopulator</span>) <span style="color:#a6e22e">findAndAddNewPods</span>() {
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">//...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#66d9ef">for</span> <span style="color:#a6e22e">_</span>, <span style="color:#a6e22e">pod</span> <span style="color:#f92672">:=</span> <span style="color:#66d9ef">range</span> <span style="color:#a6e22e">dswp</span>.<span style="color:#a6e22e">podManager</span>.<span style="color:#a6e22e">GetPods</span>() {  
+</span></span><span style="display:flex;"><span>	   <span style="color:#75715e">//...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	   <span style="color:#75715e">// 填充 desiredStateOfWorld 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	   <span style="color:#a6e22e">dswp</span>.<span style="color:#a6e22e">processPodVolumes</span>(<span style="color:#a6e22e">pod</span>, <span style="color:#a6e22e">mountedVolumesForPod</span>)
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e">//...  
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		<span style="color:#f92672">-</span>&gt; <span style="color:#a6e22e">uniqueVolumeName</span>, <span style="color:#a6e22e">err</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">dswp</span>.<span style="color:#a6e22e">desiredStateOfWorld</span>.<span style="color:#a6e22e">AddPodToVolume</span>(  
+</span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">uniquePodName</span>, <span style="color:#a6e22e">pod</span>, <span style="color:#a6e22e">volumeSpec</span>, <span style="color:#a6e22e">podVolume</span>.<span style="color:#a6e22e">Name</span>, <span style="color:#a6e22e">volumeGidValue</span>, <span style="color:#a6e22e">seLinuxContainerContexts</span>[<span style="color:#a6e22e">podVolume</span>.<span style="color:#a6e22e">Name</span>])
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h4 id="findandremovedeletedpods">
+    findAndRemoveDeletedPods<a class="hash-link" href="#findandremovedeletedpods" title="Direct link to heading">#</a>
+</h4><blockquote>
+<p>遍历所期望状态下的所有pod，如果informer中不再存在，则将其移除</p>
+</blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">dswp</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">desiredStateOfWorldPopulator</span>) <span style="color:#a6e22e">findAndRemoveDeletedPods</span>() {
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">//...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#a6e22e">pod</span>, <span style="color:#a6e22e">podExists</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">dswp</span>.<span style="color:#a6e22e">podManager</span>.<span style="color:#a6e22e">GetPodByUID</span>(<span style="color:#a6e22e">volumeToMount</span>.<span style="color:#a6e22e">Pod</span>.<span style="color:#a6e22e">UID</span>)  
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">podExists</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e">// ...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		<span style="color:#75715e">// 判断pod中容器是否都已经终止
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		<span style="color:#66d9ef">if</span> !<span style="color:#a6e22e">dswp</span>.<span style="color:#a6e22e">podStateProvider</span>.<span style="color:#a6e22e">ShouldPodRuntimeBeRemoved</span>(<span style="color:#a6e22e">pod</span>.<span style="color:#a6e22e">UID</span>) {  
+</span></span><span style="display:flex;"><span>		   <span style="color:#66d9ef">continue</span>  
+</span></span><span style="display:flex;"><span>		}
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e">// 是否保持终止pod的卷  node上注解KeepTerminatedPodVolumesAnnotation
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">dswp</span>.<span style="color:#a6e22e">keepTerminatedPodVolumes</span> {  
+</span></span><span style="display:flex;"><span>		   <span style="color:#66d9ef">continue</span>  
+</span></span><span style="display:flex;"><span>		}
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">removed</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">dswp</span>.<span style="color:#a6e22e">actualStateOfWorld</span>.<span style="color:#a6e22e">PodRemovedFromVolume</span>(<span style="color:#a6e22e">volumeToMount</span>.<span style="color:#a6e22e">PodName</span>, <span style="color:#a6e22e">volumeToMount</span>.<span style="color:#a6e22e">VolumeName</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">removed</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#a6e22e">podExists</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">continue</span>
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// 删除期望的状态，以及相关记录
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#a6e22e">dswp</span>.<span style="color:#a6e22e">desiredStateOfWorld</span>.<span style="color:#a6e22e">DeletePodFromVolume</span>(  
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">volumeToMount</span>.<span style="color:#a6e22e">PodName</span>, <span style="color:#a6e22e">volumeToMount</span>.<span style="color:#a6e22e">VolumeName</span>)  
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">dswp</span>.<span style="color:#a6e22e">deleteProcessedPod</span>(<span style="color:#a6e22e">volumeToMount</span>.<span style="color:#a6e22e">PodName</span>)
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h3 id="mountorattachvolumes">
+    mountOrAttachVolumes<a class="hash-link" href="#mountorattachvolumes" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>Kubelet的Volume挂载流程，调用OperationExecutor执行MountVolume</p>
+</blockquote>
+<h4 id="mountvolume">
+    MountVolume<a class="hash-link" href="#mountvolume" title="Direct link to heading">#</a>
+</h4><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">oe</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">operationExecutor</span>) <span style="color:#a6e22e">MountVolume</span>(<span style="color:#f92672">...</span>) <span style="color:#66d9ef">error</span> {
+</span></span><span style="display:flex;"><span>	<span style="color:#f92672">-</span>&gt; <span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">og</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">operationGenerator</span>) <span style="color:#a6e22e">GenerateDetachVolumeFunc</span>(<span style="color:#f92672">...</span>)(<span style="color:#f92672">...</span>) {
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">volumePlugin</span>, <span style="color:#a6e22e">err</span> <span style="color:#f92672">:=</span>  
+</span></span><span style="display:flex;"><span>	   <span style="color:#a6e22e">og</span>.<span style="color:#a6e22e">volumePluginMgr</span>.<span style="color:#a6e22e">FindPluginBySpec</span>(<span style="color:#a6e22e">volumeToMount</span>.<span style="color:#a6e22e">VolumeSpec</span>)
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">mountVolumeFunc</span> <span style="color:#f92672">:=</span> <span style="color:#66d9ef">func</span>() <span style="color:#a6e22e">volumetypes</span>.<span style="color:#a6e22e">OperationContext</span> {
+</span></span><span style="display:flex;"><span>		   <span style="color:#75715e">// 获取挂载卷插件
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>			<span style="color:#a6e22e">volumePlugin</span>, <span style="color:#a6e22e">err</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">og</span>.<span style="color:#a6e22e">volumePluginMgr</span>.<span style="color:#a6e22e">FindPluginBySpec</span>(<span style="color:#a6e22e">volumeToMount</span>.<span style="color:#a6e22e">VolumeSpec</span>)
+</span></span><span style="display:flex;"><span>			<span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>			<span style="color:#75715e">// 检查node亲和性  
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>			<span style="color:#a6e22e">affinityErr</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">checkNodeAffinity</span>(<span style="color:#a6e22e">og</span>, <span style="color:#a6e22e">volumeToMount</span>)
+</span></span><span style="display:flex;"><span>			<span style="color:#75715e">// 获取mounter，所有的挂载类型都拥有
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>			<span style="color:#a6e22e">volumeMounter</span>, <span style="color:#a6e22e">newMounterErr</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">volumePlugin</span>.<span style="color:#a6e22e">NewMounter</span>(<span style="color:#f92672">...</span>)
+</span></span><span style="display:flex;"><span>			<span style="color:#75715e">//获取attacher，所有的卷都需要挂载以及接触挂载，但是不是所有的都需要attacher  
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>			<span style="color:#a6e22e">attachableVolumePlugin</span>, <span style="color:#a6e22e">_</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">og</span>.<span style="color:#a6e22e">volumePluginMgr</span>.<span style="color:#a6e22e">FindAttachablePluginBySpec</span>(<span style="color:#a6e22e">volumeToMount</span>.<span style="color:#a6e22e">VolumeSpec</span>)
+</span></span><span style="display:flex;"><span>			<span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>			<span style="color:#a6e22e">deviceMountableVolumePlugin</span>, <span style="color:#a6e22e">_</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">og</span>.<span style="color:#a6e22e">volumePluginMgr</span>.<span style="color:#a6e22e">FindDeviceMountablePluginBySpec</span>(<span style="color:#a6e22e">volumeToMount</span>.<span style="color:#a6e22e">VolumeSpec</span>)
+</span></span><span style="display:flex;"><span>			<span style="color:#75715e">// 核心 设置挂载文件（创建路径并且写入内容）
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>			<span style="color:#a6e22e">mountErr</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">volumeMounter</span>.<span style="color:#a6e22e">SetUp</span>(<span style="color:#f92672">...</span>)
+</span></span><span style="display:flex;"><span>				<span style="color:#75715e">// setup失败后会删除卷
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>				<span style="color:#f92672">-</span>&gt; <span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">b</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">configMapVolumeMounter</span>) <span style="color:#a6e22e">SetUpAt</span>(<span style="color:#a6e22e">dir</span> <span style="color:#66d9ef">string</span>, <span style="color:#a6e22e">mounterArgs</span> <span style="color:#a6e22e">volume</span>.<span style="color:#a6e22e">MounterArgs</span>) <span style="color:#66d9ef">error</span> {
+</span></span><span style="display:flex;"><span>					<span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>					<span style="color:#75715e">// 获取configmap资源，如果不是可选项找不到的时候会报configmap not fount错误
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>					<span style="color:#a6e22e">configMap</span>, <span style="color:#a6e22e">err</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">b</span>.<span style="color:#a6e22e">getConfigMap</span>(<span style="color:#a6e22e">b</span>.<span style="color:#a6e22e">pod</span>.<span style="color:#a6e22e">Namespace</span>, <span style="color:#a6e22e">b</span>.<span style="color:#a6e22e">source</span>.<span style="color:#a6e22e">Name</span>)
+</span></span><span style="display:flex;"><span>					<span style="color:#75715e">// 拼装payload  map[string]volumeutil.FileProjection对象（文件名和文件投影信息）,但没有指定mode的时候采用默认模式
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>					<span style="color:#a6e22e">payload</span>, <span style="color:#a6e22e">err</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">MakePayload</span>(<span style="color:#a6e22e">b</span>.<span style="color:#a6e22e">source</span>.<span style="color:#a6e22e">Items</span>, <span style="color:#a6e22e">configMap</span>, <span style="color:#a6e22e">b</span>.<span style="color:#a6e22e">source</span>.<span style="color:#a6e22e">DefaultMode</span>, <span style="color:#a6e22e">optional</span>)
+</span></span><span style="display:flex;"><span>					<span style="color:#75715e">// 创建挂载点，获取当前卷的所有挂载路径
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>					<span style="color:#75715e">// 1. 不能再rootfs之外创建目录
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>					<span style="color:#75715e">// 2. 检查每个装载点，看看它是否嵌套在这个卷下面
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>					<span style="color:#a6e22e">volumeutil</span>.<span style="color:#a6e22e">MakeNestedMountpoints</span>(<span style="color:#a6e22e">b</span>.<span style="color:#a6e22e">volName</span>, <span style="color:#a6e22e">dir</span>, <span style="color:#a6e22e">b</span>.<span style="color:#a6e22e">pod</span>)
+</span></span><span style="display:flex;"><span>				}
+</span></span><span style="display:flex;"><span>		}
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><ul class="pa0">
+  
+   <li class="list di">
+     <a href="/tags/kubernetes/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">Kubernetes</a>
+   </li>
+  
+   <li class="list di">
+     <a href="/tags/volume/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">Volume</a>
+   </li>
+  
+</ul>
+<div class="mt6 instapaper_ignoref">
+      
+      
+      <script src="https://utteranc.es/client.js" repo="ZhongsJie96/ZhongsJie96.github.io" issue-term="pathname"
+        label="Comment" theme="github-light" crossorigin="anonymous" async>
+        </script>
+    </div>
+  </div>
+
+  <aside class="w-30-l mt6-l">
+
+
+
+
+</aside>
+
+</article>
+
+    </main>
+    <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn">
+      &copy;  Atomage's Blog  2022-2022 
+    </a>
+    <div>
+<div class="ananke-socials">
+  
+    
+    <a href="https://github.com/ZhongsJie96" target="_blank" rel="noopener" class="github ananke-social-link link-transition stackoverflow link dib z-999 pt3 pt0-l mr1" title="GitHub link" aria-label="follow on GitHub——Opens in a new window">
+      
+        <span class="icon"><svg style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+</span>
+      
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;"/>
+</svg>
+</span></a>
+  
+</div>
+</div>
+    <a href="https://beian.miit.gov.cn/" class="link db f6 pa2 br3 bg-mid-gray white dim w4 tc"> 蜀ICP备2022025742号 </a>
+    
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
+<script>
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+	gtag('config', 'G-HVT9CMYGB1', { 'anonymize_ip': false });
+}
+</script>
+
+  </div>
+</footer>
+
+  </body>
+</html>

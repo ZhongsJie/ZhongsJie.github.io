@@ -24,6 +24,7 @@ params:
   background_color_class: "bg-black"
   featured_image: "/images/gohugo-default-sample-hero-image.jpg"
   recent_posts_number: 8
+  description: "分界"
 
 sitemap:
   changefreq: "monthly"
