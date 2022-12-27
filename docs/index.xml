@@ -6,7 +6,16 @@
     <description>Recent content on Atomage&#39;s Blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-cn</language>
-    <lastBuildDate>Fri, 23 Dec 2022 12:36:09 +0800</lastBuildDate><atom:link href="https://blogs.atomage.cn/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Tue, 27 Dec 2022 22:37:43 +0800</lastBuildDate><atom:link href="https://blogs.atomage.cn/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Kubelet StatusManager机制流程分析</title>
+      <link>https://blogs.atomage.cn/posts/2022-12-27-kubelet-statusmanager-mechanism-process-analysis/</link>
+      <pubDate>Tue, 27 Dec 2022 22:37:43 +0800</pubDate>
+      
+      <guid>https://blogs.atomage.cn/posts/2022-12-27-kubelet-statusmanager-mechanism-process-analysis/</guid>
+      <description>Kubelet StatusManager机制流程分析# 主要功能将Pod状态信息同步到ApiServer，并不会主动监控Pod状态，提供接口供其他Manager调用，当其他组件需要改变 pod 的状态时会将 pod 的 status 信息发送到 statusManager 进行同步。主要使用方probeManager，podWorkers type manager struct { kubeClient clientset.Interface podManager kubepod.Manager // Map from pod UID to sync status of the corresponding pod. // statusManager 的 cache，保存 pod 与状态的对应关系； podStatuses map[types.UID]versionedPodStatus podStatusesLock sync.RWMutex // 当其他组件调用 statusManager 更新 pod 状态时，会将 pod 的状态信息发送到podStatusesChannel 中； podStatusChannel chan podStatusSyncRequest // Map from (mirror) pod UID to latest status version successfully sent to the API server. // apiStatusVersions must only be accessed from the sync thread. apiStatusVersions map[kubetypes.MirrorPodUID]uint64 // 删除 pod 的接口 podDeletionSafety PodDeletionSafetyProvider podStartupLatencyHelper PodStartupLatencyStateHelper } Start# // 设置定时触发，时间为10s syncTicker := time.NewTicker(syncPeriod).C go wait.Forever(func() { for { select { // 监听到一个</description>
+    </item>
+    
     <item>
       <title>Kubelet VolumeManager机制流程分析</title>
       <link>https://blogs.atomage.cn/posts/2022-12-23-kubelet-volumemanager-mechanism-process-analysis/</link>

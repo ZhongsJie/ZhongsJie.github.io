@@ -6,6 +6,7 @@ subtitle: ""
 author: "ZhongsJie"
 tags:
   - Kubernetes
+  - Kubelet
   - Volume
 categories:
   - Kubernetes

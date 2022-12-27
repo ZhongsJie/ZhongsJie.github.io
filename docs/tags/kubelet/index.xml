@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>📎Posts on Atomage&#39;s Blog</title>
-    <link>https://blogs.atomage.cn/posts/</link>
-    <description>Recent content in 📎Posts on Atomage&#39;s Blog</description>
+    <title>Kubelet on Atomage&#39;s Blog</title>
+    <link>https://blogs.atomage.cn/tags/kubelet/</link>
+    <description>Recent content in Kubelet on Atomage&#39;s Blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-cn</language>
-    <lastBuildDate>Fri, 09 Dec 2022 17:36:50 +0800</lastBuildDate><atom:link href="https://blogs.atomage.cn/posts/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Tue, 27 Dec 2022 22:37:43 +0800</lastBuildDate><atom:link href="https://blogs.atomage.cn/tags/kubelet/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Kubelet StatusManager机制流程分析</title>
       <link>https://blogs.atomage.cn/posts/2022-12-27-kubelet-statusmanager-mechanism-process-analysis/</link>
@@ -23,15 +23,6 @@
       
       <guid>https://blogs.atomage.cn/posts/2022-12-23-kubelet-volumemanager-mechanism-process-analysis/</guid>
       <description>Kubelet VolumeManager机制流程分析# Kubelet Volume相关逻辑主要在VolumeManager模块 Mount 阶段则由对应节点的 kubelet 中的 volume manager 处理。 volume manager 获取 node.Status.VolumesAttached 属性值，发现 volume 已被标记为 attached, 就会进行 mount 操作 k8s中涉及存储的组件主要有：attach/detach controller、pv controller、volume manager、volume plugins、scheduler。每个组件分工明确： attach/detach controller：负责对 volume 进行 attach/detach persistent volume controller：负责处理 pv/pvc 对象，包括 pv 的 provision/delete kubelet volume manager：主要负责对 volume 进行 mount/unmount volume plugins：包含 k8s 原生的和各厂商的的存储插件 挂载流程# 第一步是在准备 volume（</description>
-    </item>
-    
-    <item>
-      <title>Nginx指南</title>
-      <link>https://blogs.atomage.cn/posts/2022-12-09-nginx-learning/</link>
-      <pubDate>Fri, 09 Dec 2022 17:36:50 +0800</pubDate>
-      
-      <guid>https://blogs.atomage.cn/posts/2022-12-09-nginx-learning/</guid>
-      <description>Nginx 介绍# “Nginx 是一款轻量级的 HTTP 服务器，采用事件驱动的异步非阻塞处理方式框架，这让其具有极好的 IO 性能，时常用于服务端的反向代理和负载均衡。” 正向代理 正向代理“代理”的是客户端，而且客户端是知道目标的，而目标是不知道客户端是通过VPN访问的。 反向代理 反向代理“代理”的是服务器端，而且这一个过程对于客户端而言是透明的。 Nginx的Master-Worker模式# Master 读取并配置nginx.conf, 管理Worker进程 Worker 维护一个线程（避免线程切换），处理连接和请求；注意Worker进程的个数由配置文件决定，一般和CPU个数相关（有利于进程切换），配置几个就有几个Worker进程。 Nginx热部署#</description>
     </item>
     
   </channel>
