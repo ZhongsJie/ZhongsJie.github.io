@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>draft on Atomage&#39;s Blog</title>
+    <link>https://blogs.atomage.cn/categories/draft/</link>
+    <description>Recent content in draft on Atomage&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>zh-cn</language>
+    <lastBuildDate>Wed, 12 Jul 2023 22:12:14 +0800</lastBuildDate><atom:link href="https://blogs.atomage.cn/categories/draft/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>TCP/IP 协议</title>
+      <link>https://blogs.atomage.cn/posts/2023-07-10-tcp-ip-protocol/</link>
+      <pubDate>Wed, 12 Jul 2023 22:12:14 +0800</pubDate>
+      
+      <guid>https://blogs.atomage.cn/posts/2023-07-10-tcp-ip-protocol/</guid>
+      <description>TCP/IP 协议的那些东西# 本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结，加强一下个人的书写能力。 概述# 网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理 应用层 ：为特定应用程序提供数据传输服务，例如 HTTP、DNS 等协议。数据单位为报文。 传输层 ：为进程提供通用数据传输服务。由于应用层协议很多，定义通用的传输层协议就可以支持不断增多的应用层协议。传输层包括两种协议： 传输控制协议 TCP，提供面</description>
+    </item>
+    
+  </channel>
+</rss>

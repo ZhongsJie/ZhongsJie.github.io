@@ -7,7 +7,7 @@
     <title>Nginx指南 | Atomage&#39;s Blog</title>
     <meta name="viewport" content="width=device-width,minimum-scale=1">
     <meta name="description" content="Nginx 介绍# “Nginx 是一款轻量级的 HTTP 服务器，采用事件驱动的异步非阻塞处理方式框架，这让其具有极好的 IO 性能，时常用于服务端的反向代理和负载均衡。” 正向代理 正向代理“代理”的是客户端，而且客户端是知道目标的，而目标是不知道客户端是通过VPN访问的。 反向代理 反向代理“代理”的是服务器端，而且这一个过程对于客户端而言是透明的。 Nginx的Master-Worker模式# Master 读取并配置nginx.conf, 管理Worker进程 Worker 维护一个线程（避免线程切换），处理连接和请求；注意Worker进程的个数由配置文件决定，一般和CPU个数相关（有利于进程切换），配置几个就有几个Worker进程。 Nginx热部署#">
-    <meta name="generator" content="Hugo 0.107.0">
+    <meta name="generator" content="Hugo 0.115.2">
     
     
     
@@ -35,7 +35,6 @@
 <meta property="og:url" content="https://blogs.atomage.cn/posts/2022-12-09-nginx-learning/" /><meta property="article:section" content="posts" />
 <meta property="article:published_time" content="2022-12-09T17:36:50+08:00" />
 <meta property="article:modified_time" content="2022-12-09T17:36:50+08:00" />
-
 <meta itemprop="name" content="Nginx指南">
 <meta itemprop="description" content="Nginx 介绍# “Nginx 是一款轻量级的 HTTP 服务器，采用事件驱动的异步非阻塞处理方式框架，这让其具有极好的 IO 性能，时常用于服务端的反向代理和负载均衡。” 正向代理 正向代理“代理”的是客户端，而且客户端是知道目标的，而目标是不知道客户端是通过VPN访问的。 反向代理 反向代理“代理”的是服务器端，而且这一个过程对于客户端而言是透明的。 Nginx的Master-Worker模式# Master 读取并配置nginx.conf, 管理Worker进程 Worker 维护一个线程（避免线程切换），处理连接和请求；注意Worker进程的个数由配置文件决定，一般和CPU个数相关（有利于进程切换），配置几个就有几个Worker进程。 Nginx热部署#"><meta itemprop="datePublished" content="2022-12-09T17:36:50+08:00" />
 <meta itemprop="dateModified" content="2022-12-09T17:36:50+08:00" />
@@ -237,7 +236,7 @@
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
     <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn">
-      &copy;  Atomage's Blog  2022-2022 
+      &copy;  Atomage's Blog  2022-2023 
     </a>
     <div>
 <div class="ananke-socials">

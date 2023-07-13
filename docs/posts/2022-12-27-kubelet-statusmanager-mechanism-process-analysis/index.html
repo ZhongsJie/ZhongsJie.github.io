@@ -7,7 +7,7 @@
     <title>Kubelet StatusManager机制流程分析 | Atomage&#39;s Blog</title>
     <meta name="viewport" content="width=device-width,minimum-scale=1">
     <meta name="description" content="Kubelet StatusManager机制流程分析# 主要功能将Pod状态信息同步到ApiServer，并不会主动监控Pod状态，提供接口供其他Manager调用，当其他组件需要改变 pod 的状态时会将 pod 的 status 信息发送到 statusManager 进行同步。主要使用方probeManager，podWorkers type manager struct { kubeClient clientset.Interface podManager kubepod.Manager // Map from pod UID to sync status of the corresponding pod. // statusManager 的 cache，保存 pod 与状态的对应关系； podStatuses map[types.UID]versionedPodStatus podStatusesLock sync.RWMutex // 当其他组件调用 statusManager 更新 pod 状态时，会将 pod 的状态信息发送到podStatusesChannel 中； podStatusChannel chan podStatusSyncRequest // Map from (mirror) pod UID to latest status version successfully sent to the API server. // apiStatusVersions must only be accessed from the sync thread. apiStatusVersions map[kubetypes.MirrorPodUID]uint64 // 删除 pod 的接口 podDeletionSafety PodDeletionSafetyProvider podStartupLatencyHelper PodStartupLatencyStateHelper } Start# // 设置定时触发，时间为10s syncTicker := time.NewTicker(syncPeriod).C go wait.Forever(func() { for { select { // 监听到一个">
-    <meta name="generator" content="Hugo 0.107.0">
+    <meta name="generator" content="Hugo 0.115.2">
     
     
     
@@ -35,7 +35,6 @@
 <meta property="og:url" content="https://blogs.atomage.cn/posts/2022-12-27-kubelet-statusmanager-mechanism-process-analysis/" /><meta property="article:section" content="posts" />
 <meta property="article:published_time" content="2022-12-27T22:37:43+08:00" />
 <meta property="article:modified_time" content="2022-12-27T22:37:43+08:00" />
-
 <meta itemprop="name" content="Kubelet StatusManager机制流程分析">
 <meta itemprop="description" content="Kubelet StatusManager机制流程分析# 主要功能将Pod状态信息同步到ApiServer，并不会主动监控Pod状态，提供接口供其他Manager调用，当其他组件需要改变 pod 的状态时会将 pod 的 status 信息发送到 statusManager 进行同步。主要使用方probeManager，podWorkers type manager struct { kubeClient clientset.Interface podManager kubepod.Manager // Map from pod UID to sync status of the corresponding pod. // statusManager 的 cache，保存 pod 与状态的对应关系； podStatuses map[types.UID]versionedPodStatus podStatusesLock sync.RWMutex // 当其他组件调用 statusManager 更新 pod 状态时，会将 pod 的状态信息发送到podStatusesChannel 中； podStatusChannel chan podStatusSyncRequest // Map from (mirror) pod UID to latest status version successfully sent to the API server. // apiStatusVersions must only be accessed from the sync thread. apiStatusVersions map[kubetypes.MirrorPodUID]uint64 // 删除 pod 的接口 podDeletionSafety PodDeletionSafetyProvider podStartupLatencyHelper PodStartupLatencyStateHelper } Start# // 设置定时触发，时间为10s syncTicker := time.NewTicker(syncPeriod).C go wait.Forever(func() { for { select { // 监听到一个"><meta itemprop="datePublished" content="2022-12-27T22:37:43+08:00" />
 <meta itemprop="dateModified" content="2022-12-27T22:37:43+08:00" />
@@ -414,7 +413,7 @@
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
     <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn">
-      &copy;  Atomage's Blog  2022-2022 
+      &copy;  Atomage's Blog  2022-2023 
     </a>
     <div>
 <div class="ananke-socials">

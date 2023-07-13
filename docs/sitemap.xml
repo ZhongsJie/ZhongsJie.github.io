@@ -3,12 +3,22 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://blogs.atomage.cn/</loc>
-    <lastmod>2022-12-27T22:37:43+08:00</lastmod>
+    <lastmod>2023-07-12T22:12:14+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
     <loc>https://blogs.atomage.cn/categories/</loc>
-    <lastmod>2022-12-27T22:37:43+08:00</lastmod>
+    <lastmod>2023-07-12T22:12:14+08:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
+    <loc>https://blogs.atomage.cn/categories/network/</loc>
+    <lastmod>2023-07-12T22:12:14+08:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
+    <loc>https://blogs.atomage.cn/posts/2023-07-10-tcp-ip-protocol/</loc>
+    <lastmod>2023-07-12T22:12:14+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
@@ -72,6 +82,10 @@
     <priority>0.5</priority>
   </url><url>
     <loc>https://blogs.atomage.cn/about/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
+    <loc>https://blogs.atomage.cn/tags/tcp/ip/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>

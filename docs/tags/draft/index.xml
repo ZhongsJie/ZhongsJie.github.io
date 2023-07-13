@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>draft on Atomage&#39;s Blog</title>
+    <link>https://blogs.atomage.cn/tags/draft/</link>
+    <description>Recent content in draft on Atomage&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>zh-cn</language>
+    <lastBuildDate>Wed, 12 Jul 2023 22:12:14 +0800</lastBuildDate><atom:link href="https://blogs.atomage.cn/tags/draft/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>TCP/IP 协议</title>
+      <link>https://blogs.atomage.cn/posts/2023-07-10-tcp-ip-protocol/</link>
+      <pubDate>Wed, 12 Jul 2023 22:12:14 +0800</pubDate>
+      
+      <guid>https://blogs.atomage.cn/posts/2023-07-10-tcp-ip-protocol/</guid>
+      <description>TCP/IP 协议的那些东西# 本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结，加强一下个人的书写能力。 概述# 网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理 TCP头格式# TCP的包没有IP地址, 只有源端口和目标端口, 加上IP首部中的源端IP地址和目的端IP地址唯一确定一个TCP连接(四元组,加上协议是五元组) 一组IP地址和端口成为Socket Sequence Number是包的序号，报文段中的的第一个数据字</description>
+    </item>
+    
+  </channel>
+</rss>

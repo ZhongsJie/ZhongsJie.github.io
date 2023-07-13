@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    
+    <title>TCP/IP 协议的那些东西 | Atomage&#39;s Blog</title>
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="description" content="TCP/IP 协议的那些东西# 本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。 概述# 网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理 应用层 ：为特定应用程序提供数据传输服务，例如 HTTP、DNS 等协议。数据单位为报文。 传输层 ：为进程提供通用数据传输服务。由于应用层协议很多，定义通用的传输层协议就可以支持不断增多的应用层协议。传输层包括两种协议： 传输控制协议 TCP，提供面向连接、可靠的数据传输服">
+    <meta name="generator" content="Hugo 0.115.2">
+    
+    
+    
+    
+      <meta name="robots" content="noindex, nofollow">
+    
+
+    
+<link rel="stylesheet" href="/ananke/css/main.min.css" >
+
+
+
+    
+    
+    
+      
+
+    
+
+    
+    
+    <meta property="og:title" content="TCP/IP 协议的那些东西" />
+<meta property="og:description" content="TCP/IP 协议的那些东西# 本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。 概述# 网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理 应用层 ：为特定应用程序提供数据传输服务，例如 HTTP、DNS 等协议。数据单位为报文。 传输层 ：为进程提供通用数据传输服务。由于应用层协议很多，定义通用的传输层协议就可以支持不断增多的应用层协议。传输层包括两种协议： 传输控制协议 TCP，提供面向连接、可靠的数据传输服" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://blogs.atomage.cn/posts/2023-07-10-tcp-ip-protocol/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2023-07-12T22:12:14+08:00" />
+<meta property="article:modified_time" content="2023-07-12T22:12:14+08:00" />
+<meta itemprop="name" content="TCP/IP 协议的那些东西">
+<meta itemprop="description" content="TCP/IP 协议的那些东西# 本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。 概述# 网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理 应用层 ：为特定应用程序提供数据传输服务，例如 HTTP、DNS 等协议。数据单位为报文。 传输层 ：为进程提供通用数据传输服务。由于应用层协议很多，定义通用的传输层协议就可以支持不断增多的应用层协议。传输层包括两种协议： 传输控制协议 TCP，提供面向连接、可靠的数据传输服"><meta itemprop="datePublished" content="2023-07-12T22:12:14+08:00" />
+<meta itemprop="dateModified" content="2023-07-12T22:12:14+08:00" />
+<meta itemprop="wordCount" content="3536">
+<meta itemprop="keywords" content="TCP/IP," /><meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="TCP/IP 协议的那些东西"/>
+<meta name="twitter:description" content="TCP/IP 协议的那些东西# 本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。 概述# 网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理 应用层 ：为特定应用程序提供数据传输服务，例如 HTTP、DNS 等协议。数据单位为报文。 传输层 ：为进程提供通用数据传输服务。由于应用层协议很多，定义通用的传输层协议就可以支持不断增多的应用层协议。传输层包括两种协议： 传输控制协议 TCP，提供面向连接、可靠的数据传输服"/>
+
+	
+  </head>
+
+  <body class="ma0 avenir bg-near-white">
+
+    
+
+
+
+  <header>
+    <div class="bg-black">
+      <nav class="pv3 ph3 ph4-ns" role="navigation">
+  <div class="flex-l justify-between items-center center">
+    <a href="/" class="f3 fw2 hover-white no-underline white-90 dib">
+      
+        Atomage&#39;s Blog
+      
+    </a>
+    <div class="flex-l items-center">
+      
+
+      
+        <ul class="pl0 mr3">
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/archives/" title="⏱️Archives page">
+              ⏱️Archives
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/posts/" title="📎Posts page">
+              📎Posts
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/about/" title="🙋🏻‍♂️About page">
+              🙋🏻‍♂️About
+            </a>
+          </li>
+          
+        </ul>
+      
+      
+<div class="ananke-socials">
+  
+    
+    <a href="https://github.com/ZhongsJie96" target="_blank" rel="noopener" class="github ananke-social-link link-transition stackoverflow link dib z-999 pt3 pt0-l mr1" title="GitHub link" aria-label="follow on GitHub——Opens in a new window">
+      
+        <span class="icon"><svg style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+</span>
+      
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;"/>
+</svg>
+</span></a>
+  
+</div>
+
+    </div>
+  </div>
+</nav>
+
+    </div>
+  </header>
+
+
+
+    <main class="pb7" role="main">
+      
+
+<article class="flex-l flex-wrap justify-between mw8 center ph3">
+  <header class="mt4 w-100">
+    <aside class="instapaper_ignoref b helvetica tracked">
+      
+      📎POSTS
+    </aside>
+    
+
+
+
+
+
+
+
+
+
+
+  <div id="sharing" class="mt3 ananke-socials">
+    
+  </div>
+
+
+    <h1 class="f1 athelas mt3 mb1">TCP/IP 协议的那些东西</h1>
+    
+    <p class="tracked">
+      By <strong>
+        
+        ZhongsJie
+        
+      </strong>
+    </p>
+    
+    
+    <time class="f6 mv4 dib tracked" datetime="2023-07-12T22:12:14+08:00" >July 12, 2023</time>
+
+    
+    
+    <span class="f6 mv4 dib tracked"> - 8 minutes read</span>
+    <span class="f6 mv4 dib tracked"> - 3536 words</span>
+    
+  </header>
+  <div class="nested-copy-line-height lh-copy serif f4 nested-links
+    nested-img mid-gray pr4-l w-100-l"><h2 id="tcpip-协议的那些东西">
+    TCP/IP 协议的那些东西<a class="hash-link" href="#tcpip-%e5%8d%8f%e8%ae%ae%e7%9a%84%e9%82%a3%e4%ba%9b%e4%b8%9c%e8%a5%bf" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。</p>
+</blockquote>
+<h3 id="概述">
+    概述<a class="hash-link" href="#%e6%a6%82%e8%bf%b0" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理</p>
+</blockquote>
+<p><img src="/images/2023-07/image-OSI-model.png" alt="OSI Model"></p>
+<ul>
+<li><strong>应用层</strong> ：为特定应用程序提供数据传输服务，例如 HTTP、DNS 等协议。数据单位为报文。</li>
+<li><strong>传输层</strong> ：为进程提供通用数据传输服务。由于应用层协议很多，定义通用的传输层协议就可以支持不断增多的应用层协议。传输层包括两种协议：
+<ul>
+<li><strong>传输控制协议 TCP</strong>，提供面向<strong>连接、可靠</strong>的数据传输服务，数据单位为报文段；</li>
+<li><strong>用户数据报协议 UDP</strong>，提供无连接、尽最大努力的数据传输服务，数据单位为用户数据报。TCP 主要提供完整性服务，UDP 主要<strong>提供及时性服务</strong>。</li>
+</ul>
+</li>
+<li><strong>网络层</strong> ：为主机提供数据传输服务。而传输层协议是为主机中的进程提供数据传输服务。网络层把传输层传递下来的报文段或者用户数据报封装成分组，<strong>IP协议</strong></li>
+<li><strong>数据链路层</strong> ：网络层针对的还是主机之间的数据传输服务，而主机之间可以有很多链路，链路层协议就是为同一链路的主机提供数据传输服务。数据链路层把网络层传下来的分组<strong>封装成帧</strong>。</li>
+<li><strong>物理层</strong> ：考虑的是怎样在传输媒体上传输数据比特流，而不是指具体的传输媒体。物理层的作用是尽可能屏蔽传输媒体和通信手段的差异，使数据链路层感觉不到这些差异。</li>
+</ul>
+<hr>
+<h3 id="tcp头格式">
+    TCP头格式<a class="hash-link" href="#tcp%e5%a4%b4%e6%a0%bc%e5%bc%8f" title="Direct link to heading">#</a>
+</h3><p><img src="/images/2023-07/image-TCP-Header.jpg" alt="TCP Header"></p>
+<ol>
+<li>TCP的包没有IP地址, 只有源端口和目标端口, 加上IP首部中的源端IP地址和目的端IP地址唯一确定一个TCP连接(<strong>四元组</strong>,加上协议是五元组)
+<ul>
+<li>一组IP地址和端口成为Socket
+<img src="/images/2023-07/image-socket.png" alt="五元组"></li>
+</ul>
+</li>
+<li>Sequence Number是包的序号，报文段中的的第一个数据字节，用来解决网络包乱序问题。</li>
+<li>Acknowledgement Number就是ACK——用于确认收到，用来解决不丢包的问题。</li>
+<li>Window又叫Advertised-Window，也就是著名的滑动窗口（Sliding Window），用于解决流量控制</li>
+<li>在TCP首部中有6个标志比特（TCP Flag）。它们中的多个可同时被设置为 1
+<ul>
+<li>URG 紧急指针（urgent pointer）有效</li>
+<li>ACK 确认序号有效。</li>
+<li>PSH 接收方应该尽快将这个报文段交给应用层</li>
+<li>RST 重建连接。</li>
+<li>SYN 同步序号用来发起一个连接。</li>
+<li>FIN 发端完成发送任务。</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h3 id="tcp的连接和终止">
+    TCP的连接和终止<a class="hash-link" href="#tcp%e7%9a%84%e8%bf%9e%e6%8e%a5%e5%92%8c%e7%bb%88%e6%ad%a2" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>TCP为应用层提供全双工服务, 这意味数据能在两个方向上独立地进行传输</p>
+</blockquote>
+<p><img src="/images/2023-07/image-tcp-open-close.jpg" alt="三次握手&amp;四次挥手"></p>
+<ol>
+<li>
+<p>三次握手</p>
+<ul>
+<li>要初始化Sequence Number 的初始值。通信的双方要互相通知对方自己的初始化的Sequence Number（缩写为ISN：Inital Sequence Number）——所以叫SYN，全称Synchronize Sequence Numbers。这个号要作为以后的数据通信的序号，以保证应用层接收到的数据不会因为网络上的传输的问题而乱序（TCP会用这个序号来拼接数据）。</li>
+<li>建立连接需要解决的三个问题
+<ul>
+<li>要使每一方能够确知对方的存在</li>
+<li>允许双方协商一些参数</li>
+<li>能够对运输实体资源进行分配</li>
+</ul>
+</li>
+<li>为什么要握手三次
+<ul>
+<li>建立连接的时候，不允许出现半打开状态（半建立状态）下传送消息（TCP的规范）</li>
+<li>防止<strong>已失效</strong>的连接请求报文段突然又传送到服务器端（客户端已失效的连接到服务端认为是重新连接从而造成服务端的资源浪费）</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p>四次挥手</p>
+<ul>
+<li>TCP是全双工的，发送方和接收方都需要Fin和Ack。如果两边同时断连接，那就会就进入到CLOSING状态，然后到达TIME_WAIT状态。</li>
+<li>服务器端进入<strong>ClOSE-WAIT（关闭等待）<strong>状态。TCP服务器进程这时应通知高层应用进程，这时的TCP连接处于</strong>半关闭状态</strong>。服务器端若发送数据，客户端仍要接收，这个状态会持续一段时间。</li>
+<li>RST包用于强制关闭TCP链接</li>
+</ul>
+</li>
+<li>
+<p>建立连接的超时</p>
+<ul>
+<li>连接建立过程中，任一端出现接收不到对端ACK的情况时，都将导致本端重传初始SYN segment。 在Linux下，<strong>默认重试次数为5次</strong>，重试的间隔时间从1s开始每次都翻售，5次的重试时间间隔为1s, 2s, 4s, 8s, 16s，总共31s，第五次32s后知道超时。</li>
+<li>重传间隔：
+<ul>
+<li>若当前为第N次重传，则与上一次发送或重传的间隔时间为2的(N -1)次方秒，但最长间隔不超过120秒；内核的TCP_TIMEOUT_INIT/TCP_RTO_MIN/TCP_RTO_MAX宏分别定义了间隔时间的初始值/最小值/最大值</li>
+</ul>
+</li>
+<li>重传次数：
+<ul>
+<li>客户端由tcp_syn_retries指定，对应的proc文件为<code>/proc/sys/net/ipv4/tcp_syn_retries</code>，sysctl参数为<code>net.ipv4.tcp_syn_retries</code>；</li>
+<li>服务端由tcp_synack_retries指定，对应的proc文件为<code>/proc/sys/net/ipv4/tcp_synack_retries</code>，sysctl参数为<code>net.ipv4.tcp_synack_retries</code></li>
+</ul>
+</li>
+<li>修改TCP内核参数： <code>sudo vim /etc/sysctl.conf</code></li>
+</ul>
+</li>
+<li>
+<p>MSL和TIME_WAIT(RFC793定义MSL为2分钟)</p>
+<ul>
+<li>MSL(最长报文段寿命)指明TCP报文在Internet上最长生存时间</li>
+<li>从TIME_WAIT状态到CLOSED状态，有一个<strong>超时设置</strong>，这个超时设置是 2*MSL
+<ul>
+<li>为了让本连接持续时间内所产生的所有报文都从网络中消失，使得下一个连接不会出现旧的连接请求报文</li>
+<li>TIME_WAIT确保有足够的时间让对端收到了ACK,如果server端没收到确认报文，那么就会重传</li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h3 id="tcp超时重传">
+    TCP超时重传<a class="hash-link" href="#tcp%e8%b6%85%e6%97%b6%e9%87%8d%e4%bc%a0" title="Direct link to heading">#</a>
+</h3><p><img src="/images/2023-07/image-tcp-retransimit.png" alt="超时重传"></p>
+<ol>
+<li>
+<p>TCP管理几个定时器：</p>
+<ul>
+<li>重传定时器使用于当希望收到另一端的确认</li>
+<li>坚持(persist)定时器使窗口大小信息保持不断流动</li>
+<li>保活(keepalive)定时器可检测到一个空闲连接的另一端何时崩溃或重启</li>
+<li>2MSL定时器测量一个连接处于TIME_WAIT状态的时间</li>
+</ul>
+</li>
+<li>
+<p>超时时间设置（时间驱动, 根据不同算法计算出RTT时间）</p>
+<ul>
+<li>RTT：Round-Trip Time 往返时延，数据从网络一端传送到另一端所需的时间，也就是包的往返时间。</li>
+<li>RTO：Retransmission Timeout 超时重传时间。</li>
+<li>超时重传时间 RTO 的值需略大于报文往返 RTT 的值</li>
+</ul>
+</li>
+<li>
+<p>快速重传（Fast Retransmit）机制，不以时间为驱动，而是以数据驱动重传</p>
+<ul>
+<li>快速重传的工作方式是当收到三个相同的 ACK 报文时，会在定时器过期之前，重传丢失的报文段。</li>
+<li>对此有两种选择：
+<ul>
+<li>一种是仅重传timeout的包（SACK方法，TCP头部「选项」字段里加一个SACK的东西，它可以将缓存的信息发送给发送方。在Linux下，可以通过tcp_sack参数打开这个功能）</li>
+<li>另一种是重传timeout后所有的数据</li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h3 id="tcp流量控制">
+    TCP流量控制<a class="hash-link" href="#tcp%e6%b5%81%e9%87%8f%e6%8e%a7%e5%88%b6" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>TCP头里有一个字段叫Window，又叫Advertised-Window，这个字段是接收端告诉发送端自己还有多少缓冲区可以接收数据。于是发送端就可以根据这个接收端的处理能力来发送数据，而不会导致接收端处理不过来</p>
+</blockquote>
+<p><img src="/images/2023-07/image-tcp-cache.png" alt="tcp-cache"></p>
+<ol>
+<li>利用滑动窗口实现流量控制，就是让发送方的发送速率不要太快，要让接收方来得及接收。</li>
+<li>发送方的发送窗口不能超过接收方给出的接收窗口的数值</li>
+<li>流量控制往往指点对点通信量的控制，是个端对端的问题</li>
+<li>zero window: TCP使用了Zero Window Probe技术，缩写为ZWP，也就是说，发送端在窗口变成0后，会发ZWP的包给接收方，让接收方来ack他的Window尺</li>
+</ol>
+<h3 id="tcp拥塞控制">
+    TCP拥塞控制<a class="hash-link" href="#tcp%e6%8b%a5%e5%a1%9e%e6%8e%a7%e5%88%b6" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>所谓拥塞控制就是防止过多的数据注入到网络中，这样可以使网络中的路由器或链路不致过载, 当拥塞发生的时候，要做自我牺牲</p>
+</blockquote>
+<p>拥塞控制主要是四个算法：1）慢开始，2）拥塞避免，3）拥塞发生，4）快恢复</p>
+<ol>
+<li>发送方维护一个拥塞窗口cwnd的变量，值取决于网络的拥塞程度，并且值是动态的
+<ul>
+<li>拥塞窗口的原则是，只要网络中没有拥塞，拥塞窗口就扩大一些。当出现网络拥塞的时候，窗口会减小</li>
+<li>判断是否出现拥塞的原则，是否接收到确认信息（是否发生重传）</li>
+</ul>
+</li>
+<li>发送方将拥塞窗口作为发送窗口：swnd = cwnd</li>
+<li>维护一个慢开始门限ssthread的状态变量
+<ul>
+<li>cwnd &lt; ssthread: 慢开始</li>
+<li>cwnd &gt; ssthread: 拥塞避免</li>
+<li>cwnd = ssthread: 慢开始或拥塞避免</li>
+</ul>
+</li>
+<li>发送方收到3个重复确认，知道只是丢失了部分字段，不会进入慢开始，而是执行快恢复</li>
+</ol>
+<p><img src="/images/2023-07/image-tcp-congestion-control.png" alt="congestion-controll">
+<strong>慢开始</strong></p>
+<ol>
+<li>刚加入网络的时候一点点提速，直到到达ssthread慢开始门限</li>
+<li>连接建好的开始先初始化cwnd = 1，表明可以传一个MSS大小的数据。</li>
+<li>每当收到一个ACK，cwnd++; 呈线性上升</li>
+<li>每当过了一个RTT，cwnd = cwnd*2; 呈指数让升</li>
+</ol>
+<p><strong>拥塞避免</strong></p>
+<ol>
+<li>收到一个ACK时，cwnd = cwnd + 1/cwnd</li>
+<li>当每过一个RTT时，cwnd = cwnd + 1</li>
+</ol>
+<p><strong>拥塞状态</strong></p>
+<ol>
+<li>等到RTO超时，重传数据包。TCP认为这种情况太糟糕，反应也很强烈。
+<ul>
+<li>sshthresh =  cwnd /2</li>
+<li>cwnd 重置为 1</li>
+<li>进入慢启动过程</li>
+</ul>
+</li>
+<li>Fast Retransmit算法，也就是在收到3个duplicate ACK时就开启重传，而不用等到RTO超时，随后进入到快恢复</li>
+</ol>
+<p><strong>快恢复</strong></p>
+<ol>
+<li>发送方将慢开始门限ssthread和cwnd窗口都设置为当前的一半，并且开始执行拥塞避免算法</li>
+</ol>
+<ul class="pa0">
+  
+   <li class="list di">
+     <a href="/tags/tcp/ip/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">TCP/IP</a>
+   </li>
+  
+</ul>
+<div class="mt6 instapaper_ignoref">
+      
+      
+      <script src="https://utteranc.es/client.js" repo="ZhongsJie96/ZhongsJie96.github.io" issue-term="pathname"
+        label="Comment" theme="github-light" crossorigin="anonymous" async>
+        </script>
+    </div>
+  </div>
+
+  <aside class="w-30-l mt6-l">
+
+
+
+
+</aside>
+
+</article>
+
+    </main>
+    <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn">
+      &copy;  Atomage's Blog  2022-2023 
+    </a>
+    <div>
+<div class="ananke-socials">
+  
+    
+    <a href="https://github.com/ZhongsJie96" target="_blank" rel="noopener" class="github ananke-social-link link-transition stackoverflow link dib z-999 pt3 pt0-l mr1" title="GitHub link" aria-label="follow on GitHub——Opens in a new window">
+      
+        <span class="icon"><svg style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+</span>
+      
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;"/>
+</svg>
+</span></a>
+  
+</div>
+</div>
+    <a href="https://beian.miit.gov.cn/" class="link db f6 pa2 br3 bg-mid-gray white dim w4 tc"> 蜀ICP备2022025742号 </a>
+    
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
+<script>
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+	gtag('config', 'G-HVT9CMYGB1', { 'anonymize_ip': false });
+}
+</script>
+
+  </div>
+</footer>
+
+  </body>
+</html>
