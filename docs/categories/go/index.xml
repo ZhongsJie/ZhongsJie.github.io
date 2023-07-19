@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Go on Atomage&#39;s Blog</title>
+    <link>https://blogs.atomage.cn/categories/go/</link>
+    <description>Recent content in Go on Atomage&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>zh-cn</language>
+    <lastBuildDate>Wed, 19 Jul 2023 13:10:33 +0800</lastBuildDate><atom:link href="https://blogs.atomage.cn/categories/go/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Go 内存模型与分配机制</title>
+      <link>https://blogs.atomage.cn/posts/2023-07-19-go-memory-model/</link>
+      <pubDate>Wed, 19 Jul 2023 13:10:33 +0800</pubDate>
+      
+      <guid>https://blogs.atomage.cn/posts/2023-07-19-go-memory-model/</guid>
+      <description>Go内存模型指定了一个goroutine中变量的读取条件，可以保证观察不同goroutine中对同一变量的写入产生的值。 虚拟内存# 虚拟内存技术是操作系统实现的一种高效的物理内存管理方式 虚拟内存通过页表映射到物理内存上，页表记录是否在物理内存上（有效位），以及物理内存页的地址 操作系统为每个进程提供了一个独立的页表，因此也就是一个独立的虚拟空间地址，多个虚拟页面可以映射到同一个共享物理页面上。 地址翻译：一个N元素的虚拟地址空间的元素和一个M元素的物理地址空间中元素之间的映射 虚拟内存：利用磁盘空间虚拟出一块逻辑内存，用作虚拟内存的磁盘空间被称为交换空间 操作系统内存管理中，一个重要概念虚拟内存: 扩大地</description>
+    </item>
+    
+  </channel>
+</rss>

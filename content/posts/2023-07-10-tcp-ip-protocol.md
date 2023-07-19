@@ -124,7 +124,7 @@ cover:
 1. 利用滑动窗口实现流量控制，就是让发送方的发送速率不要太快，要让接收方来得及接收。
 2. 发送方的发送窗口不能超过接收方给出的接收窗口的数值
 3. 流量控制往往指点对点通信量的控制，是个端对端的问题
-4. zero window: TCP使用了Zero Window Probe技术，缩写为ZWP，也就是说，发送端在窗口变成0后，会发ZWP的包给接收方，让接收方来ack他的Window尺
+4. zero window: TCP使用了Zero Window Probe技术，缩写为ZWP，也就是说，发送端在窗口变成0后，会发ZWP的包给接收方，让接收方来ack他的Window大小
 
 
 ### TCP拥塞控制

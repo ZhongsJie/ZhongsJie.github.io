@@ -7,7 +7,7 @@
     <title>Kubelet VolumeManager机制流程分析 | Atomage&#39;s Blog</title>
     <meta name="viewport" content="width=device-width,minimum-scale=1">
     <meta name="description" content="Kubelet VolumeManager机制流程分析# Kubelet Volume相关逻辑主要在VolumeManager模块 Mount 阶段则由对应节点的 kubelet 中的 volume manager 处理。 volume manager 获取 node.Status.VolumesAttached 属性值，发现 volume 已被标记为 attached, 就会进行 mount 操作 k8s中涉及存储的组件主要有：attach/detach controller、pv controller、volume manager、volume plugins、scheduler。每个组件分工明确： attach/detach controller：负责对 volume 进行 attach/detach persistent volume controller：负责处理 pv/pvc 对象，包括 pv 的 provision/delete kubelet volume manager：主要负责对 volume 进行 mount/unmount volume plugins：包含 k8s 原生的和各厂商的的存储插件 挂载流程# 第一步是在准备 volume（">
-    <meta name="generator" content="Hugo 0.115.2">
+    <meta name="generator" content="Hugo 0.115.3">
     
     
     

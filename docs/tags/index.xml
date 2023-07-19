@@ -6,7 +6,25 @@
     <description>Recent content in Tags on Atomage&#39;s Blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-cn</language>
-    <lastBuildDate>Tue, 27 Dec 2022 22:37:43 +0800</lastBuildDate><atom:link href="https://blogs.atomage.cn/tags/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Wed, 19 Jul 2023 13:10:33 +0800</lastBuildDate><atom:link href="https://blogs.atomage.cn/tags/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Go</title>
+      <link>https://blogs.atomage.cn/tags/go/</link>
+      <pubDate>Wed, 19 Jul 2023 13:10:33 +0800</pubDate>
+      
+      <guid>https://blogs.atomage.cn/tags/go/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>Memory</title>
+      <link>https://blogs.atomage.cn/tags/memory/</link>
+      <pubDate>Wed, 19 Jul 2023 13:10:33 +0800</pubDate>
+      
+      <guid>https://blogs.atomage.cn/tags/memory/</guid>
+      <description></description>
+    </item>
+    
     <item>
       <title>Kubelet</title>
       <link>https://blogs.atomage.cn/tags/kubelet/</link>
