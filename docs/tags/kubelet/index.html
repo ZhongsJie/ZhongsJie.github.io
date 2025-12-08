@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="zh-cn">
-  <head>
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
-    <title>Kubelet | Atomage&#39;s Blog</title>
+    <title>Atomage&#39;s Blog</title>
     <meta name="viewport" content="width=device-width,minimum-scale=1">
     <meta name="description" content="分界">
-    <meta name="generator" content="Hugo 0.115.3">
+    <meta name="generator" content="Hugo 0.145.0">
     
     
     
@@ -34,14 +34,20 @@
       
     
     
-    <meta property="og:title" content="Kubelet" />
-<meta property="og:description" content="分界" />
-<meta property="og:type" content="website" />
-<meta property="og:url" content="https://blogs.atomage.cn/tags/kubelet/" />
-<meta itemprop="name" content="Kubelet">
-<meta itemprop="description" content="分界"><meta name="twitter:card" content="summary"/>
-<meta name="twitter:title" content="Kubelet"/>
-<meta name="twitter:description" content="分界"/>
+    <meta property="og:url" content="http://localhost:1313/tags/kubelet/">
+  <meta property="og:site_name" content="Atomage&#39;s Blog">
+  <meta property="og:title" content="Kubelet">
+  <meta property="og:description" content="分界">
+  <meta property="og:locale" content="zh_cn">
+  <meta property="og:type" content="website">
+
+  <meta itemprop="name" content="Kubelet">
+  <meta itemprop="description" content="分界">
+  <meta itemprop="datePublished" content="2022-12-27T22:37:43+08:00">
+  <meta itemprop="dateModified" content="2022-12-27T22:37:43+08:00">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Kubelet">
+  <meta name="twitter:description" content="分界">
 
 	
   </head>
@@ -137,7 +143,99 @@
       </a>
     </h1>
     <div class="nested-links f5 lh-copy nested-copy-line-height">
-      Kubelet StatusManager机制流程分析# 主要功能将Pod状态信息同步到ApiServer，并不会主动监控Pod状态，提供接口供其他Manager调用，当其他组件需要改变 pod 的状态时会将 pod 的 status 信息发送到 statusManager 进行同步。主要使用方probeManager，podWorkers type manager struct { kubeClient clientset.Interface podManager kubepod.Manager // Map from pod UID to sync status of the corresponding pod. // statusManager 的 cache，保存 pod 与状态的对应关系； podStatuses map[types.UID]versionedPodStatus podStatusesLock sync.RWMutex // 当其他组件调用 statusManager 更新 pod 状态时，会将 pod 的状态信息发送到podStatusesChannel 中； podStatusChannel chan podStatusSyncRequest // Map from (mirror) pod UID to latest status version successfully sent to the API server. // apiStatusVersions must only be accessed from the sync thread. apiStatusVersions map[kubetypes.MirrorPodUID]uint64 // 删除 pod 的接口 podDeletionSafety PodDeletionSafetyProvider podStartupLatencyHelper PodStartupLatencyStateHelper } Start# // 设置定时触发，时间为10s syncTicker := time.NewTicker(syncPeriod).C go wait.Forever(func() { for { select { // 监听到一个
+      <h2 id="kubelet-statusmanager机制流程分析">
+    Kubelet StatusManager机制流程分析<a class="hash-link" href="#kubelet-statusmanager%e6%9c%ba%e5%88%b6%e6%b5%81%e7%a8%8b%e5%88%86%e6%9e%90" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>主要功能将Pod状态信息同步到ApiServer，并不会主动监控Pod状态，提供接口供其他Manager调用，当其他组件需要改变 pod 的状态时会将 pod 的 status 信息发送到 statusManager 进行同步。主要使用方<code>probeManager</code>，<code>podWorkers</code></p></blockquote>
+<p><img src="/images/2022-12/image-StatusManager.png" alt="StatusManager"></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">manager</span> <span style="color:#66d9ef">struct</span> {  
+</span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">kubeClient</span> <span style="color:#a6e22e">clientset</span>.<span style="color:#a6e22e">Interface</span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">podManager</span> <span style="color:#a6e22e">kubepod</span>.<span style="color:#a6e22e">Manager</span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// Map from pod UID to sync status of the corresponding pod.  </span>
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// statusManager 的 cache，保存 pod 与状态的对应关系；</span>
+</span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">podStatuses</span>      <span style="color:#66d9ef">map</span>[<span style="color:#a6e22e">types</span>.<span style="color:#a6e22e">UID</span>]<span style="color:#a6e22e">versionedPodStatus</span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">podStatusesLock</span>  <span style="color:#a6e22e">sync</span>.<span style="color:#a6e22e">RWMutex</span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// 当其他组件调用 statusManager 更新 pod 状态时，会将 pod 的状态信息发送到podStatusesChannel 中；</span>
+</span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">podStatusChannel</span> <span style="color:#66d9ef">chan</span> <span style="color:#a6e22e">podStatusSyncRequest</span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// Map from (mirror) pod UID to latest status version successfully sent to the API server.  </span>
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// apiStatusVersions must only be accessed from the sync thread.  </span>
+</span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">apiStatusVersions</span> <span style="color:#66d9ef">map</span>[<span style="color:#a6e22e">kubetypes</span>.<span style="color:#a6e22e">MirrorPodUID</span>]<span style="color:#66d9ef">uint64</span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// 删除 pod 的接口</span>
+</span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">podDeletionSafety</span> <span style="color:#a6e22e">PodDeletionSafetyProvider</span>  
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">podStartupLatencyHelper</span> <span style="color:#a6e22e">PodStartupLatencyStateHelper</span>  
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h2 id="start">
+    Start<a class="hash-link" href="#start" title="Direct link to heading">#</a>
+</h2><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">// 设置定时触发，时间为10s</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">syncTicker</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">NewTicker</span>(<span style="color:#a6e22e">syncPeriod</span>).<span style="color:#a6e22e">C</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">go</span> <span style="color:#a6e22e">wait</span>.<span style="color:#a6e22e">Forever</span>(<span style="color:#66d9ef">func</span>() {  
+</span></span><span style="display:flex;"><span>   <span style="color:#66d9ef">for</span> {  
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">select</span> {  
+</span></span><span style="display:flex;"><span>      <span style="color:#75715e">// 监听到一个pod状态变更的场景</span>
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">case</span> <span style="color:#a6e22e">syncRequest</span> <span style="color:#f92672">:=</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">m</span>.<span style="color:#a6e22e">podStatusChannel</span>:  
+</span></span><span style="display:flex;"><span>         <span style="color:#a6e22e">klog</span>.<span style="color:#a6e22e">V</span>(<span style="color:#ae81ff">5</span>).<span style="color:#a6e22e">InfoS</span>(<span style="color:#e6db74">&#34;Status Manager: syncing pod with status from podStatusChannel&#34;</span>,  
+</span></span><span style="display:flex;"><span>            <span style="color:#e6db74">&#34;podUID&#34;</span>, <span style="color:#a6e22e">syncRequest</span>.<span style="color:#a6e22e">podUID</span>,  
+</span></span><span style="display:flex;"><span>            <span style="color:#e6db74">&#34;statusVersion&#34;</span>, <span style="color:#a6e22e">syncRequest</span>.<span style="color:#a6e22e">status</span>.<span style="color:#a6e22e">version</span>,  
+</span></span><span style="display:flex;"><span>            <span style="color:#e6db74">&#34;status&#34;</span>, <span style="color:#a6e22e">syncRequest</span>.<span style="color:#a6e22e">status</span>.<span style="color:#a6e22e">status</span>)  
+</span></span><span style="display:flex;"><span>         <span style="color:#a6e22e">m</span>.<span style="color:#a6e22e">syncPod</span>(<span style="color:#a6e22e">syncRequest</span>.<span style="color:#a6e22e">podUID</span>, <span style="color:#a6e22e">syncRequest</span>.<span style="color:#a6e22e">status</span>) 
+</span></span><span style="display:flex;"><span>	         <span style="color:#f92672">-</span>&gt; <span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">m</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">manager</span>) <span style="color:#a6e22e">needsUpdate</span>(<span style="color:#a6e22e">uid</span> <span style="color:#a6e22e">types</span>.<span style="color:#a6e22e">UID</span>, <span style="color:#a6e22e">status</span> <span style="color:#a6e22e">versionedPodStatus</span>) <span style="color:#66d9ef">bool</span> {
+</span></span><span style="display:flex;"><span>		         <span style="color:#75715e">// 1. 判断版本号信息</span>
+</span></span><span style="display:flex;"><span>		         <span style="color:#75715e">// 2. 获取pod</span>
+</span></span><span style="display:flex;"><span>		         <span style="color:#75715e">// 3. 判断是否处于删除状态</span>
+</span></span><span style="display:flex;"><span>			         <span style="color:#f92672">-</span>&gt; <span style="color:#a6e22e">PodResourcesAreReclaimed</span> <span style="color:#75715e">// 检查 pod 在 node 上占用的所有资源是否已经被回收</span>
+</span></span><span style="display:flex;"><span>	         }
+</span></span><span style="display:flex;"><span>      <span style="color:#75715e">// 触发定时器（定时器，syncPeriod 默认为 10s）</span>
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">syncTicker</span>:  
+</span></span><span style="display:flex;"><span>         <span style="color:#a6e22e">klog</span>.<span style="color:#a6e22e">V</span>(<span style="color:#ae81ff">5</span>).<span style="color:#a6e22e">InfoS</span>(<span style="color:#e6db74">&#34;Status Manager: syncing batch&#34;</span>)  
+</span></span><span style="display:flex;"><span>         <span style="color:#75715e">// remove any entries in the status channel since the batch will handle them  </span>
+</span></span><span style="display:flex;"><span>         <span style="color:#66d9ef">for</span> <span style="color:#a6e22e">i</span> <span style="color:#f92672">:=</span> len(<span style="color:#a6e22e">m</span>.<span style="color:#a6e22e">podStatusChannel</span>); <span style="color:#a6e22e">i</span> &gt; <span style="color:#ae81ff">0</span>; <span style="color:#a6e22e">i</span><span style="color:#f92672">--</span> {  
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">m</span>.<span style="color:#a6e22e">podStatusChannel</span>  
+</span></span><span style="display:flex;"><span>         }  
+</span></span><span style="display:flex;"><span>         <span style="color:#a6e22e">m</span>.<span style="color:#a6e22e">syncBatch</span>()  
+</span></span><span style="display:flex;"><span>      }  
+</span></span><span style="display:flex;"><span>   }  
+</span></span><span style="display:flex;"><span>}, <span style="color:#ae81ff">0</span>)
+</span></span></code></pre></div><h3 id="syncpod">
+    syncPod<a class="hash-link" href="#syncpod" title="Direct link to heading">#</a>
+</h3><ol>
+<li>基本流程
+<ul>
+<li>判断是否需要同步状态， 判断版本号信息是否已经增加，若不需要同步则继续检查 pod 是否处于删除状态</li>
+<li>合并状态信息并更新记录到cache</li>
+<li>如果可以删除pod，执行删除动作</li>
+</ul>
+</li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">m</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">manager</span>) <span style="color:#a6e22e">syncPod</span>(<span style="color:#a6e22e">uid</span> <span style="color:#a6e22e">types</span>.<span style="color:#a6e22e">UID</span>, <span style="color:#a6e22e">status</span> <span style="color:#a6e22e">versionedPodStatus</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// 判断是否需要同步状态，以及是否处于删除状态</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> !<span style="color:#a6e22e">m</span>.<span style="color:#a6e22e">needsUpdate</span>(<span style="color:#a6e22e">uid</span>, <span style="color:#a6e22e">status</span>) {
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// 判断ResolvedPodUID是否一致，不一致则为删除后重建出来的pod，需要删除statusmanager保存的旧状态信息</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> len(<span style="color:#a6e22e">translatedUID</span>) &gt; <span style="color:#ae81ff">0</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#a6e22e">translatedUID</span> <span style="color:#f92672">!=</span> <span style="color:#a6e22e">kubetypes</span>.<span style="color:#a6e22e">ResolvedPodUID</span>(<span style="color:#a6e22e">uid</span>) {
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e">// 删除保存的状态信息，以及启动延时处理的状态  </span>
+</span></span><span style="display:flex;"><span>	   <span style="color:#a6e22e">m</span>.<span style="color:#a6e22e">deletePodStatus</span>(<span style="color:#a6e22e">uid</span>)  
+</span></span><span style="display:flex;"><span>	   <span style="color:#66d9ef">return</span>  
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// 根据实际运行状态以及其他组件设置的状态合并出最终状态信息</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">mergedStatus</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">mergePodStatus</span>(<span style="color:#a6e22e">pod</span>.<span style="color:#a6e22e">Status</span>, <span style="color:#a6e22e">status</span>.<span style="color:#a6e22e">status</span>, <span style="color:#a6e22e">m</span>.<span style="color:#a6e22e">podDeletionSafety</span>.<span style="color:#a6e22e">PodCouldHaveRunningContainers</span>(<span style="color:#a6e22e">pod</span>))
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// 更新pod状态信息以及所记录状态</span>
+</span></span><span style="display:flex;"><span>	
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// 如果pod处理删除状态，删除pod以及记录信息</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">m</span>.<span style="color:#a6e22e">canBeDeleted</span>(<span style="color:#a6e22e">pod</span>, <span style="color:#a6e22e">status</span>.<span style="color:#a6e22e">status</span>) {
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e">// 设置GracePeriodSecond为0，同时避免删除一个同名同命名空间的资源，传递Uid做precondition</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">err</span> = <span style="color:#a6e22e">m</span>.<span style="color:#a6e22e">kubeClient</span>.<span style="color:#a6e22e">CoreV1</span>().<span style="color:#a6e22e">Pods</span>(<span style="color:#a6e22e">pod</span>.<span style="color:#a6e22e">Namespace</span>).<span style="color:#a6e22e">Delete</span>(<span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">TODO</span>(), <span style="color:#a6e22e">pod</span>.<span style="color:#a6e22e">Name</span>, <span style="color:#a6e22e">deleteOptions</span>)
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">m</span>.<span style="color:#a6e22e">deletePodStatus</span>(<span style="color:#a6e22e">uid</span>)
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h3 id="syncbatch">
+    syncBatch<a class="hash-link" href="#syncbatch" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>定期将statusManager 缓存 podStatuses 中的数据同步到 apiserver，定时同步的时候会清理channel内容</p>
     </div>
   </div>
 </div>
@@ -154,7 +252,27 @@
       </a>
     </h1>
     <div class="nested-links f5 lh-copy nested-copy-line-height">
-      Kubelet VolumeManager机制流程分析# Kubelet Volume相关逻辑主要在VolumeManager模块 Mount 阶段则由对应节点的 kubelet 中的 volume manager 处理。 volume manager 获取 node.Status.VolumesAttached 属性值，发现 volume 已被标记为 attached, 就会进行 mount 操作 k8s中涉及存储的组件主要有：attach/detach controller、pv controller、volume manager、volume plugins、scheduler。每个组件分工明确： attach/detach controller：负责对 volume 进行 attach/detach persistent volume controller：负责处理 pv/pvc 对象，包括 pv 的 provision/delete kubelet volume manager：主要负责对 volume 进行 mount/unmount volume plugins：包含 k8s 原生的和各厂商的的存储插件 挂载流程# 第一步是在准备 volume（
+      <h2 id="kubelet-volumemanager机制流程分析">
+    Kubelet VolumeManager机制流程分析<a class="hash-link" href="#kubelet-volumemanager%e6%9c%ba%e5%88%b6%e6%b5%81%e7%a8%8b%e5%88%86%e6%9e%90" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>Kubelet Volume相关逻辑主要在VolumeManager模块</p></blockquote>
+<p><img src="/images/2022-12/image-volumemanager.png" alt="VolumeManager"></p>
+<ol>
+<li>Mount 阶段则由对应节点的 kubelet 中的 volume manager 处理。</li>
+<li>volume manager 获取 node.Status.VolumesAttached 属性值，发现 volume 已被标记为 attached, 就会进行 mount 操作</li>
+<li>k8s中涉及存储的组件主要有：attach/detach controller、pv controller、volume manager、volume plugins、scheduler。每个组件分工明确：
+<ul>
+<li><strong>attach/detach controller</strong>：负责对 volume 进行 attach/detach</li>
+<li><strong>persistent volume controller</strong>：负责处理 pv/pvc 对象，包括 pv 的 provision/delete</li>
+<li><strong>kubelet volume manage</strong>r：主要负责对 volume 进行 mount/unmount</li>
+<li><strong>volume plugins</strong>：包含 k8s 原生的和各厂商的的存储插件</li>
+</ul>
+</li>
+</ol>
+<h3 id="挂载流程">
+    挂载流程<a class="hash-link" href="#%e6%8c%82%e8%bd%bd%e6%b5%81%e7%a8%8b" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>第一步是在准备 volume（宿主机目录），第二步才是真正的挂载操作。</p>
     </div>
   </div>
 </div>
@@ -167,8 +285,8 @@
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn">
-      &copy;  Atomage's Blog  2022-2023 
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
+      &copy;  Atomage's Blog  2022-2025 
     </a>
     <div>
 <div class="ananke-socials">
@@ -190,17 +308,20 @@
 </div>
     <a href="https://beian.miit.gov.cn/" class="link db f6 pa2 br3 bg-mid-gray white dim w4 tc"> 蜀ICP备2022025742号 </a>
     
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
-<script>
-var doNotTrack = false;
-if (!doNotTrack) {
-	window.dataLayer = window.dataLayer || [];
-	function gtag(){dataLayer.push(arguments);}
-	gtag('js', new Date());
-	gtag('config', 'G-HVT9CMYGB1', { 'anonymize_ip': false });
-}
-</script>
-
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
+      <script>
+        var doNotTrack = false;
+        if ( false ) {
+          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
+          var doNotTrack = (dnt == "1" || dnt == "yes");
+        }
+        if (!doNotTrack) {
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-HVT9CMYGB1');
+        }
+      </script>
   </div>
 </footer>
 

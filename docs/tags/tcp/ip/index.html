@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="zh-cn">
-  <head>
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
-    <title>TCP/IP | Atomage&#39;s Blog</title>
+    <title>Atomage&#39;s Blog</title>
     <meta name="viewport" content="width=device-width,minimum-scale=1">
     <meta name="description" content="分界">
-    <meta name="generator" content="Hugo 0.115.3">
+    <meta name="generator" content="Hugo 0.145.0">
     
     
     
@@ -34,14 +34,20 @@
       
     
     
-    <meta property="og:title" content="TCP/IP" />
-<meta property="og:description" content="分界" />
-<meta property="og:type" content="website" />
-<meta property="og:url" content="https://blogs.atomage.cn/tags/tcp/ip/" />
-<meta itemprop="name" content="TCP/IP">
-<meta itemprop="description" content="分界"><meta name="twitter:card" content="summary"/>
-<meta name="twitter:title" content="TCP/IP"/>
-<meta name="twitter:description" content="分界"/>
+    <meta property="og:url" content="http://localhost:1313/tags/tcp/ip/">
+  <meta property="og:site_name" content="Atomage&#39;s Blog">
+  <meta property="og:title" content="TCP/IP">
+  <meta property="og:description" content="分界">
+  <meta property="og:locale" content="zh_cn">
+  <meta property="og:type" content="website">
+
+  <meta itemprop="name" content="TCP/IP">
+  <meta itemprop="description" content="分界">
+  <meta itemprop="datePublished" content="2023-07-12T22:12:14+08:00">
+  <meta itemprop="dateModified" content="2023-07-12T22:12:14+08:00">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="TCP/IP">
+  <meta name="twitter:description" content="分界">
 
 	
   </head>
@@ -137,7 +143,31 @@
       </a>
     </h1>
     <div class="nested-links f5 lh-copy nested-copy-line-height">
-      TCP/IP 协议的那些东西# 本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。 概述# 网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理 应用层 ：为特定应用程序提供数据传输服务，例如 HTTP、DNS 等协议。数据单位为报文。 传输层 ：为进程提供通用数据传输服务。由于应用层协议很多，定义通用的传输层协议就可以支持不断增多的应用层协议。传输层包括两种协议： 传输控制协议 TCP，提供面向连接、可靠的数据传输服
+      <h2 id="tcpip-协议的那些东西">
+    TCP/IP 协议的那些东西<a class="hash-link" href="#tcpip-%e5%8d%8f%e8%ae%ae%e7%9a%84%e9%82%a3%e4%ba%9b%e4%b8%9c%e8%a5%bf" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。</p></blockquote>
+<h3 id="概述">
+    概述<a class="hash-link" href="#%e6%a6%82%e8%bf%b0" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理</p></blockquote>
+<p><img src="/images/2023-07/image-OSI-model.png" alt="OSI Model"></p>
+<ul>
+<li><strong>应用层</strong> ：为特定应用程序提供数据传输服务，例如 HTTP、DNS 等协议。数据单位为报文。</li>
+<li><strong>传输层</strong> ：为进程提供通用数据传输服务。由于应用层协议很多，定义通用的传输层协议就可以支持不断增多的应用层协议。传输层包括两种协议：
+<ul>
+<li><strong>传输控制协议 TCP</strong>，提供面向<strong>连接、可靠</strong>的数据传输服务，数据单位为报文段；</li>
+<li><strong>用户数据报协议 UDP</strong>，提供无连接、尽最大努力的数据传输服务，数据单位为用户数据报。TCP 主要提供完整性服务，UDP 主要<strong>提供及时性服务</strong>。</li>
+</ul>
+</li>
+<li><strong>网络层</strong> ：为主机提供数据传输服务。而传输层协议是为主机中的进程提供数据传输服务。网络层把传输层传递下来的报文段或者用户数据报封装成分组，<strong>IP协议</strong></li>
+<li><strong>数据链路层</strong> ：网络层针对的还是主机之间的数据传输服务，而主机之间可以有很多链路，链路层协议就是为同一链路的主机提供数据传输服务。数据链路层把网络层传下来的分组<strong>封装成帧</strong>。</li>
+<li><strong>物理层</strong> ：考虑的是怎样在传输媒体上传输数据比特流，而不是指具体的传输媒体。物理层的作用是尽可能屏蔽传输媒体和通信手段的差异，使数据链路层感觉不到这些差异。</li>
+</ul>
+<hr>
+<h3 id="tcp头格式">
+    TCP头格式<a class="hash-link" href="#tcp%e5%a4%b4%e6%a0%bc%e5%bc%8f" title="Direct link to heading">#</a>
+</h3><p><img src="/images/2023-07/image-TCP-Header.jpg" alt="TCP Header"></p>
     </div>
   </div>
 </div>
@@ -150,8 +180,8 @@
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn">
-      &copy;  Atomage's Blog  2022-2023 
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
+      &copy;  Atomage's Blog  2022-2025 
     </a>
     <div>
 <div class="ananke-socials">
@@ -173,17 +203,20 @@
 </div>
     <a href="https://beian.miit.gov.cn/" class="link db f6 pa2 br3 bg-mid-gray white dim w4 tc"> 蜀ICP备2022025742号 </a>
     
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
-<script>
-var doNotTrack = false;
-if (!doNotTrack) {
-	window.dataLayer = window.dataLayer || [];
-	function gtag(){dataLayer.push(arguments);}
-	gtag('js', new Date());
-	gtag('config', 'G-HVT9CMYGB1', { 'anonymize_ip': false });
-}
-</script>
-
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
+      <script>
+        var doNotTrack = false;
+        if ( false ) {
+          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
+          var doNotTrack = (dnt == "1" || dnt == "yes");
+        }
+        if (!doNotTrack) {
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-HVT9CMYGB1');
+        }
+      </script>
   </div>
 </footer>
 

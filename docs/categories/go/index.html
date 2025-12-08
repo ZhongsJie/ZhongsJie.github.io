@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="zh-cn">
-  <head>
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
-    <title>Go | Atomage&#39;s Blog</title>
+    <title>Atomage&#39;s Blog</title>
     <meta name="viewport" content="width=device-width,minimum-scale=1">
     <meta name="description" content="分界">
-    <meta name="generator" content="Hugo 0.115.3">
+    <meta name="generator" content="Hugo 0.145.0">
     
     
     
@@ -34,14 +34,20 @@
       
     
     
-    <meta property="og:title" content="Go" />
-<meta property="og:description" content="分界" />
-<meta property="og:type" content="website" />
-<meta property="og:url" content="https://blogs.atomage.cn/categories/go/" />
-<meta itemprop="name" content="Go">
-<meta itemprop="description" content="分界"><meta name="twitter:card" content="summary"/>
-<meta name="twitter:title" content="Go"/>
-<meta name="twitter:description" content="分界"/>
+    <meta property="og:url" content="http://localhost:1313/categories/go/">
+  <meta property="og:site_name" content="Atomage&#39;s Blog">
+  <meta property="og:title" content="Go">
+  <meta property="og:description" content="分界">
+  <meta property="og:locale" content="zh_cn">
+  <meta property="og:type" content="website">
+
+  <meta itemprop="name" content="Go">
+  <meta itemprop="description" content="分界">
+  <meta itemprop="datePublished" content="2023-07-19T13:10:33+08:00">
+  <meta itemprop="dateModified" content="2023-07-19T13:10:33+08:00">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Go">
+  <meta name="twitter:description" content="分界">
 
 	
   </head>
@@ -137,7 +143,42 @@
       </a>
     </h1>
     <div class="nested-links f5 lh-copy nested-copy-line-height">
-      Go内存模型指定了一个goroutine中变量的读取条件，可以保证观察不同goroutine中对同一变量的写入产生的值。 虚拟内存# 虚拟内存技术是操作系统实现的一种高效的物理内存管理方式 虚拟内存通过页表映射到物理内存上，页表记录是否在物理内存上（有效位），以及物理内存页的地址 操作系统为每个进程提供了一个独立的页表，因此也就是一个独立的虚拟空间地址，多个虚拟页面可以映射到同一个共享物理页面上。 地址翻译：一个N元素的虚拟地址空间的元素和一个M元素的物理地址空间中元素之间的映射 虚拟内存：利用磁盘空间虚拟出一块逻辑内存，用作虚拟内存的磁盘空间被称为交换空间 操作系统内存管理中，一个重要概念虚拟内存: 扩大地
+      <blockquote>
+<p>Go内存模型指定了一个goroutine中变量的读取条件，可以保证观察不同goroutine中对同一变量的写入产生的值。</p></blockquote>
+<h2 id="虚拟内存">
+    虚拟内存<a class="hash-link" href="#%e8%99%9a%e6%8b%9f%e5%86%85%e5%ad%98" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>虚拟内存技术是操作系统实现的一种高效的物理内存管理方式</p></blockquote>
+<p><img src="/images/2023-07/%E8%99%9A%E6%8B%9F%E5%9C%B0%E5%9D%80.png" alt="image-20200720222628264"></p>
+<ul>
+<li>虚拟内存通过<strong>页表</strong>映射到物理内存上，页表记录是否在物理内存上（<strong>有效位</strong>），以及物理内存页的地址</li>
+<li>操作系统为每个进程提供了一个独立的页表，因此也就是一个独立的虚拟空间地址，多个虚拟页面可以映射到同一个共享物理页面上。</li>
+<li><strong>地址翻译</strong>：一个N元素的虚拟地址空间的元素和一个M元素的物理地址空间中元素之间的映射</li>
+<li>虚拟内存：利用磁盘空间<strong>虚拟出一块逻辑内存</strong>，用作虚拟内存的磁盘空间被称为交换空间</li>
+</ul>
+<ol>
+<li>操作系统内存管理中，一个重要概念虚拟内存:
+<ul>
+<li>扩大地址空间</li>
+<li>内存保护</li>
+<li>公平内存分配</li>
+<li>当进程通信时，可采用虚存共享的方式实现</li>
+<li>不需要在实际物理内存的连续空间，**可以利用碎片</li>
+</ul>
+</li>
+<li>虚拟内存的<strong>代价</strong>：
+<ul>
+<li>管理需要建立很多数据结构，占用额外的内存</li>
+<li>虚拟地址到物理地址的转换，增加了指令的执行时间</li>
+<li>页面的换入换出需要磁盘I/O</li>
+<li>一页中只有部分数据，会浪费内存</li>
+</ul>
+</li>
+</ol>
+<h2 id="go内存模型">
+    Go内存模型<a class="hash-link" href="#go%e5%86%85%e5%ad%98%e6%a8%a1%e5%9e%8b" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>参考<a href="https://github.com/google/tcmalloc/blob/master/docs/design.md">tcmalloc</a>设计，「修改由多个goroutine同时访问的数据的程序必须序列化这种访问。 要序列化访问，请使用channel操作或其他同步原语（sync和sync/atomic）保护数据。 别自作聪明。」</p>
     </div>
   </div>
 </div>
@@ -150,8 +191,8 @@
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn">
-      &copy;  Atomage's Blog  2022-2023 
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
+      &copy;  Atomage's Blog  2022-2025 
     </a>
     <div>
 <div class="ananke-socials">
@@ -173,17 +214,20 @@
 </div>
     <a href="https://beian.miit.gov.cn/" class="link db f6 pa2 br3 bg-mid-gray white dim w4 tc"> 蜀ICP备2022025742号 </a>
     
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
-<script>
-var doNotTrack = false;
-if (!doNotTrack) {
-	window.dataLayer = window.dataLayer || [];
-	function gtag(){dataLayer.push(arguments);}
-	gtag('js', new Date());
-	gtag('config', 'G-HVT9CMYGB1', { 'anonymize_ip': false });
-}
-</script>
-
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
+      <script>
+        var doNotTrack = false;
+        if ( false ) {
+          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
+          var doNotTrack = (dnt == "1" || dnt == "yes");
+        }
+        if (!doNotTrack) {
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-HVT9CMYGB1');
+        }
+      </script>
   </div>
 </footer>
 

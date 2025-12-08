@@ -51,9 +51,10 @@
     {{- .Content -}}
     {{- partial "tags.html" . -}}
     <div class="mt6 instapaper_ignoref">
-      {{ if .Site.DisqusShortname }}
-      {{ template "_internal/disqus.html" . }}
-      {{ end }}
+      {{/* 注释掉Disqus代码以避免错误 */}}
+      {{/* if .Site.DisqusShortname */}}
+      {{/* template "_internal/disqus.html" . */}}
+      {{/* end */}}
       {{ if .Site.Params.commentoEnable }}
       {{- partial "commento.html" . -}}
       {{ end }}

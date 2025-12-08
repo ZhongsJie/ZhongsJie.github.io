@@ -1,17 +1,16 @@
-baseURL: 'https://blogs.atomage.cn'  # 绑定的域名
+baseURL: 'https://blogs.atomage.cn' # 绑定的域名
 languageCode: 'zh-cn' #en-us
 title: Atomage's Blog
 theme: 'ananke' # 主题
-# 构建的目录定义
+disqusShortname: '' # 添加disqusShortname参数，留空表示禁用
 publishDir: "docs"
 
 enableEmoji: true # 允许使用 Emoji 表情
 
 enableInlineShortcodes: true
-SectionPagesMenu: "main" 
-Paginate: 8 # 首页每页显示的文章数
-DefaultContentLanguage: "en"
-enableRobotsTXT: true # 允许爬虫抓取到搜索引擎
+SectionPagesMenu: "main"
+pagination:
+  pagerSize: 8 # 首页每页显示的文章数
 googleAnalytics: "G-HVT9CMYGB1" # googleAnalytics 谷歌统计
 hasCJKLanguage: true # 自动检测是否包含 中文日文韩文
 summaryLength: 300
