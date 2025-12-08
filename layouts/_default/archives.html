@@ -16,6 +16,8 @@
     <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray">
 
       {{ range (.Site.RegularPages.GroupByDate "2006") }}
+      {{/* 过滤掉日期为0001年的页面 */}}
+      {{ if ne .Key "0001" }}
       <h3>{{ .Key }}</h3>
 
       <ul class="archive-list">
@@ -27,6 +29,7 @@
         </li>
         {{ end }}
       </ul>
+      {{ end }}
       {{ end }}
     </div>
   </article>
