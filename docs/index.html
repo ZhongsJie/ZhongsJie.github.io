@@ -58,11 +58,8 @@
 
     
 
-  
-  <header class="cover bg-top" style="background-image: url('https://blogs.atomage.cn/images/gohugo-default-sample-hero-image.jpg'); background-size: cover; background-position: center;">
-    
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
-    <div class="bg-black-60">
+  <header>
+    <div class="pb3-m pb6-l bg-black">
       <nav class="pv3 ph3 ph4-ns" role="navigation">
   <div class="flex-l justify-between items-center center">
     <a href="./" class="f3 fw2 hover-white no-underline white-90 dib">
@@ -118,8 +115,8 @@
   </div>
 </nav>
 
-      <div class="tc-l pv6 ph3 ph4-ns">
-        <h1 class="f2 f-subheadline-l fw2 white-90 mb0 lh-title">
+      <div class="tc-l pv3 ph3 ph4-ns">
+        <h1 class="f2 f-subheadline-l fw2 light-silver mb0 lh-title">
           Atomage&#39;s Blog
         </h1>
         
@@ -157,16 +154,19 @@
         
         
           <div class="relative w-100 mb4">
-            <div class="relative w-100 mb4 bg-white nested-copy-line-height">
-  <div class="bg-white mb3 pa4 gray overflow-hidden">
-    <span class="f6 db truncate">📎Posts</span>
-    <h1 class="f3 near-black truncate">
-      <a href="./posts/2025-12-09-vllm-async-scheduling/" class="link black dim">
-        vllm 异步调度解析
-      </a>
-    </h1>
-    <div class="nested-links f5 lh-copy nested-copy-line-height overflow-hidden h-48">
-      <blockquote>
+            
+<article class="bb b--black-10">
+  <div class="db pv4 ph3 ph0-l no-underline dark-gray">
+    <div class="flex flex-column flex-row-ns">
+      
+      <div class="blah w-100">
+        <h1 class="f3 fw1 athelas mt0 lh-title">
+          <a href="./posts/2025-12-09-vllm-async-scheduling/" class="color-inherit dim link">
+            vllm 异步调度解析
+            </a>
+        </h1>
+        <div class="f6 f5-l lh-copy nested-copy-line-height nested-links">
+          <blockquote>
 <p>在vllm初始版本中只有一个同步调度策略，在该策略下GPU资源会在调度过程中形成空泡，造成GPU资源的浪费。vllm在v0.10.0版本后提供异步调度策略，并且在后续的迭代中不断加入多余其他特性的支持。原始PR内容可查看<a href="https://github.com/vllm-project/vllm/pull/19970">#19970 Implement Async Scheduling </a>，当前代码分析基于main branch(735284ed)。</p></blockquote>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_process_engine_step</span>(self) <span style="color:#f92672">-&gt;</span> bool:
 </span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;&#34;&#34;Called only when there are unfinished local requests.&#34;&#34;&#34;</span>
@@ -205,23 +205,30 @@
 </span></span></code></pre></div><blockquote>
 <p>同步调度步骤：
 调度 -&gt; 调度结果做前向推理 -&gt; 推理后的结果用来采样并更新调度器</p>
+        </div>
+          <a href="./posts/2025-12-09-vllm-async-scheduling/" class="ba b--moon-gray bg-light-gray br2 color-inherit dib f7 hover-bg-moon-gray link mt2 ph2 pv1">read more</a>
+        
+      </div>
     </div>
   </div>
-</div>
+</article>
 
           </div>
         
           <div class="relative w-100 mb4">
-            <div class="relative w-100 mb4 bg-white nested-copy-line-height">
-  <div class="bg-white mb3 pa4 gray overflow-hidden">
-    <span class="f6 db truncate">📎Posts</span>
-    <h1 class="f3 near-black truncate">
-      <a href="./posts/2023-07-19-go-memory-model/" class="link black dim">
-        Go 内存模型与分配机制
-      </a>
-    </h1>
-    <div class="nested-links f5 lh-copy nested-copy-line-height overflow-hidden h-48">
-      <blockquote>
+            
+<article class="bb b--black-10">
+  <div class="db pv4 ph3 ph0-l no-underline dark-gray">
+    <div class="flex flex-column flex-row-ns">
+      
+      <div class="blah w-100">
+        <h1 class="f3 fw1 athelas mt0 lh-title">
+          <a href="./posts/2023-07-19-go-memory-model/" class="color-inherit dim link">
+            Go 内存模型与分配机制
+            </a>
+        </h1>
+        <div class="f6 f5-l lh-copy nested-copy-line-height nested-links">
+          <blockquote>
 <p>Go内存模型指定了一个goroutine中变量的读取条件，可以保证观察不同goroutine中对同一变量的写入产生的值。</p></blockquote>
 <h2 id="虚拟内存">
     虚拟内存<a class="hash-link" href="#%e8%99%9a%e6%8b%9f%e5%86%85%e5%ad%98" title="Direct link to heading">#</a>
@@ -257,23 +264,30 @@
     Go内存模型<a class="hash-link" href="#go%e5%86%85%e5%ad%98%e6%a8%a1%e5%9e%8b" title="Direct link to heading">#</a>
 </h2><blockquote>
 <p>参考<a href="https://github.com/google/tcmalloc/blob/master/docs/design.md">tcmalloc</a>设计，「修改由多个goroutine同时访问的数据的程序必须序列化这种访问。 要序列化访问，请使用channel操作或其他同步原语（sync和sync/atomic）保护数据。 别自作聪明。」</p>
+        </div>
+          <a href="./posts/2023-07-19-go-memory-model/" class="ba b--moon-gray bg-light-gray br2 color-inherit dib f7 hover-bg-moon-gray link mt2 ph2 pv1">read more</a>
+        
+      </div>
     </div>
   </div>
-</div>
+</article>
 
           </div>
         
           <div class="relative w-100 mb4">
-            <div class="relative w-100 mb4 bg-white nested-copy-line-height">
-  <div class="bg-white mb3 pa4 gray overflow-hidden">
-    <span class="f6 db truncate">📎Posts</span>
-    <h1 class="f3 near-black truncate">
-      <a href="./posts/2023-07-10-tcp-ip-protocol/" class="link black dim">
-        TCP/IP 协议的那些东西
-      </a>
-    </h1>
-    <div class="nested-links f5 lh-copy nested-copy-line-height overflow-hidden h-48">
-      <h2 id="tcpip-协议的那些东西">
+            
+<article class="bb b--black-10">
+  <div class="db pv4 ph3 ph0-l no-underline dark-gray">
+    <div class="flex flex-column flex-row-ns">
+      
+      <div class="blah w-100">
+        <h1 class="f3 fw1 athelas mt0 lh-title">
+          <a href="./posts/2023-07-10-tcp-ip-protocol/" class="color-inherit dim link">
+            TCP/IP 协议的那些东西
+            </a>
+        </h1>
+        <div class="f6 f5-l lh-copy nested-copy-line-height nested-links">
+          <h2 id="tcpip-协议的那些东西">
     TCP/IP 协议的那些东西<a class="hash-link" href="#tcpip-%e5%8d%8f%e8%ae%ae%e7%9a%84%e9%82%a3%e4%ba%9b%e4%b8%9c%e8%a5%bf" title="Direct link to heading">#</a>
 </h2><blockquote>
 <p>本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。</p></blockquote>
@@ -298,23 +312,30 @@
 <h3 id="tcp头格式">
     TCP头格式<a class="hash-link" href="#tcp%e5%a4%b4%e6%a0%bc%e5%bc%8f" title="Direct link to heading">#</a>
 </h3><p><img src="./images/2023-07/image-TCP-Header.jpg" alt="TCP Header"></p>
+        </div>
+          <a href="./posts/2023-07-10-tcp-ip-protocol/" class="ba b--moon-gray bg-light-gray br2 color-inherit dib f7 hover-bg-moon-gray link mt2 ph2 pv1">read more</a>
+        
+      </div>
     </div>
   </div>
-</div>
+</article>
 
           </div>
         
           <div class="relative w-100 mb4">
-            <div class="relative w-100 mb4 bg-white nested-copy-line-height">
-  <div class="bg-white mb3 pa4 gray overflow-hidden">
-    <span class="f6 db truncate">📎Posts</span>
-    <h1 class="f3 near-black truncate">
-      <a href="./posts/2022-12-27-kubelet-statusmanager-mechanism-process-analysis/" class="link black dim">
-        Kubelet StatusManager机制流程分析
-      </a>
-    </h1>
-    <div class="nested-links f5 lh-copy nested-copy-line-height overflow-hidden h-48">
-      <h2 id="kubelet-statusmanager机制流程分析">
+            
+<article class="bb b--black-10">
+  <div class="db pv4 ph3 ph0-l no-underline dark-gray">
+    <div class="flex flex-column flex-row-ns">
+      
+      <div class="blah w-100">
+        <h1 class="f3 fw1 athelas mt0 lh-title">
+          <a href="./posts/2022-12-27-kubelet-statusmanager-mechanism-process-analysis/" class="color-inherit dim link">
+            Kubelet StatusManager机制流程分析
+            </a>
+        </h1>
+        <div class="f6 f5-l lh-copy nested-copy-line-height nested-links">
+          <h2 id="kubelet-statusmanager机制流程分析">
     Kubelet StatusManager机制流程分析<a class="hash-link" href="#kubelet-statusmanager%e6%9c%ba%e5%88%b6%e6%b5%81%e7%a8%8b%e5%88%86%e6%9e%90" title="Direct link to heading">#</a>
 </h2><blockquote>
 <p>主要功能将Pod状态信息同步到ApiServer，并不会主动监控Pod状态，提供接口供其他Manager调用，当其他组件需要改变 pod 的状态时会将 pod 的 status 信息发送到 statusManager 进行同步。主要使用方<code>probeManager</code>，<code>podWorkers</code></p></blockquote>
@@ -407,23 +428,30 @@
     syncBatch<a class="hash-link" href="#syncbatch" title="Direct link to heading">#</a>
 </h3><blockquote>
 <p>定期将statusManager 缓存 podStatuses 中的数据同步到 apiserver，定时同步的时候会清理channel内容</p>
+        </div>
+          <a href="./posts/2022-12-27-kubelet-statusmanager-mechanism-process-analysis/" class="ba b--moon-gray bg-light-gray br2 color-inherit dib f7 hover-bg-moon-gray link mt2 ph2 pv1">read more</a>
+        
+      </div>
     </div>
   </div>
-</div>
+</article>
 
           </div>
         
           <div class="relative w-100 mb4">
-            <div class="relative w-100 mb4 bg-white nested-copy-line-height">
-  <div class="bg-white mb3 pa4 gray overflow-hidden">
-    <span class="f6 db truncate">📎Posts</span>
-    <h1 class="f3 near-black truncate">
-      <a href="./posts/2022-12-23-kubelet-volumemanager-mechanism-process-analysis/" class="link black dim">
-        Kubelet VolumeManager机制流程分析
-      </a>
-    </h1>
-    <div class="nested-links f5 lh-copy nested-copy-line-height overflow-hidden h-48">
-      <h2 id="kubelet-volumemanager机制流程分析">
+            
+<article class="bb b--black-10">
+  <div class="db pv4 ph3 ph0-l no-underline dark-gray">
+    <div class="flex flex-column flex-row-ns">
+      
+      <div class="blah w-100">
+        <h1 class="f3 fw1 athelas mt0 lh-title">
+          <a href="./posts/2022-12-23-kubelet-volumemanager-mechanism-process-analysis/" class="color-inherit dim link">
+            Kubelet VolumeManager机制流程分析
+            </a>
+        </h1>
+        <div class="f6 f5-l lh-copy nested-copy-line-height nested-links">
+          <h2 id="kubelet-volumemanager机制流程分析">
     Kubelet VolumeManager机制流程分析<a class="hash-link" href="#kubelet-volumemanager%e6%9c%ba%e5%88%b6%e6%b5%81%e7%a8%8b%e5%88%86%e6%9e%90" title="Direct link to heading">#</a>
 </h2><blockquote>
 <p>Kubelet Volume相关逻辑主要在VolumeManager模块</p></blockquote>
@@ -444,23 +472,30 @@
     挂载流程<a class="hash-link" href="#%e6%8c%82%e8%bd%bd%e6%b5%81%e7%a8%8b" title="Direct link to heading">#</a>
 </h3><blockquote>
 <p>第一步是在准备 volume（宿主机目录），第二步才是真正的挂载操作。</p>
+        </div>
+          <a href="./posts/2022-12-23-kubelet-volumemanager-mechanism-process-analysis/" class="ba b--moon-gray bg-light-gray br2 color-inherit dib f7 hover-bg-moon-gray link mt2 ph2 pv1">read more</a>
+        
+      </div>
     </div>
   </div>
-</div>
+</article>
 
           </div>
         
           <div class="relative w-100 mb4">
-            <div class="relative w-100 mb4 bg-white nested-copy-line-height">
-  <div class="bg-white mb3 pa4 gray overflow-hidden">
-    <span class="f6 db truncate">📎Posts</span>
-    <h1 class="f3 near-black truncate">
-      <a href="./posts/2022-12-09-nginx-learning/" class="link black dim">
-        Nginx指南
-      </a>
-    </h1>
-    <div class="nested-links f5 lh-copy nested-copy-line-height overflow-hidden h-48">
-      <h2 id="nginx-介绍">
+            
+<article class="bb b--black-10">
+  <div class="db pv4 ph3 ph0-l no-underline dark-gray">
+    <div class="flex flex-column flex-row-ns">
+      
+      <div class="blah w-100">
+        <h1 class="f3 fw1 athelas mt0 lh-title">
+          <a href="./posts/2022-12-09-nginx-learning/" class="color-inherit dim link">
+            Nginx指南
+            </a>
+        </h1>
+        <div class="f6 f5-l lh-copy nested-copy-line-height nested-links">
+          <h2 id="nginx-介绍">
     <strong>Nginx</strong> 介绍<a class="hash-link" href="#nginx-%e4%bb%8b%e7%bb%8d" title="Direct link to heading">#</a>
 </h2><blockquote>
 <p>“Nginx 是一款轻量级的 HTTP 服务器，采用事件驱动的异步非阻塞处理方式框架，这让其具有极好的 IO 性能，时常用于服务端的<strong>反向代理</strong>和<strong>负载均衡</strong>。”</p></blockquote>
@@ -503,9 +538,13 @@
 <li>keepalived是以VRRP协议为实现基础的，VRRP全称Virtual Router Redundancy Protocol，即虚拟路由冗余协议。</li>
 <li>keepalived主要有三个模块，分别是core、check和vrrp。core模块为keepalived的核心，负责主进程的启动、维护以及全局配置文件的加载和解析。check负责健康检查，包括常见的各种检查方式。vrrp模块是来实现VRRP协议的。</li>
 </ol>
+        </div>
+          <a href="./posts/2022-12-09-nginx-learning/" class="ba b--moon-gray bg-light-gray br2 color-inherit dib f7 hover-bg-moon-gray link mt2 ph2 pv1">read more</a>
+        
+      </div>
     </div>
   </div>
-</div>
+</article>
 
           </div>
         

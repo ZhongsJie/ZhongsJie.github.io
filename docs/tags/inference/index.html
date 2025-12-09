@@ -58,11 +58,8 @@
 
     
 
-  
-  <header class="cover bg-top" style="background-image: url('https://blogs.atomage.cn/images/gohugo-default-sample-hero-image.jpg'); background-size: cover; background-position: center;">
-    
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
-    <div class="bg-black-60">
+  <header>
+    <div class="pb3-m pb6-l bg-black">
       <nav class="pv3 ph3 ph4-ns" role="navigation">
   <div class="flex-l justify-between items-center center">
     <a href="../../" class="f3 fw2 hover-white no-underline white-90 dib">
@@ -118,8 +115,8 @@
   </div>
 </nav>
 
-      <div class="tc-l pv6 ph3 ph4-ns">
-        <h1 class="f2 f-subheadline-l fw2 white-90 mb0 lh-title">
+      <div class="tc-l pv3 ph3 ph4-ns">
+        <h1 class="f2 f-subheadline-l fw2 light-silver mb0 lh-title">
           Inference
         </h1>
         
@@ -141,13 +138,13 @@
         <div class="relative w-100  mb4 bg-white">
           <div class="relative w-100 mb4 bg-white nested-copy-line-height">
   <div class="bg-white mb3 pa4 gray overflow-hidden">
-    <span class="f6 db truncate">📎Posts</span>
-    <h1 class="f3 near-black truncate">
+    <span class="f6 db">📎Posts</span>
+    <h1 class="f3 near-black">
       <a href="../../posts/2025-12-09-vllm-async-scheduling/" class="link black dim">
         vllm 异步调度解析
       </a>
     </h1>
-    <div class="nested-links f5 lh-copy nested-copy-line-height overflow-hidden h-48">
+    <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
       <blockquote>
 <p>在vllm初始版本中只有一个同步调度策略，在该策略下GPU资源会在调度过程中形成空泡，造成GPU资源的浪费。vllm在v0.10.0版本后提供异步调度策略，并且在后续的迭代中不断加入多余其他特性的支持。原始PR内容可查看<a href="https://github.com/vllm-project/vllm/pull/19970">#19970 Implement Async Scheduling </a>，当前代码分析基于main branch(735284ed)。</p></blockquote>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_process_engine_step</span>(self) <span style="color:#f92672">-&gt;</span> bool:
