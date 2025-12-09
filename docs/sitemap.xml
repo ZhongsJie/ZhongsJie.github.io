@@ -2,136 +2,136 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>http://localhost:62009/</loc>
+    <loc>https://blogs.atomage.cn/</loc>
     <lastmod>2025-12-09T11:51:25+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/categories/</loc>
+    <loc>https://blogs.atomage.cn/categories/</loc>
     <lastmod>2025-12-09T11:51:25+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/tags/inference/</loc>
+    <loc>https://blogs.atomage.cn/tags/inference/</loc>
     <lastmod>2025-12-09T11:51:25+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/tags/scheudle/</loc>
+    <loc>https://blogs.atomage.cn/tags/scheudle/</loc>
     <lastmod>2025-12-09T11:51:25+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/tags/</loc>
+    <loc>https://blogs.atomage.cn/tags/</loc>
     <lastmod>2025-12-09T11:51:25+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/categories/vllm/</loc>
+    <loc>https://blogs.atomage.cn/categories/vllm/</loc>
     <lastmod>2025-12-09T11:51:25+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/tags/vllm/</loc>
+    <loc>https://blogs.atomage.cn/tags/vllm/</loc>
     <lastmod>2025-12-09T11:51:25+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/posts/2025-12-09-vllm-async-scheduling/</loc>
+    <loc>https://blogs.atomage.cn/posts/2025-12-09-vllm-async-scheduling/</loc>
     <lastmod>2025-12-09T11:51:25+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/categories/go/</loc>
+    <loc>https://blogs.atomage.cn/categories/go/</loc>
     <lastmod>2023-07-19T13:10:33+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/tags/go/</loc>
+    <loc>https://blogs.atomage.cn/tags/go/</loc>
     <lastmod>2023-07-19T13:10:33+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/posts/2023-07-19-go-memory-model/</loc>
+    <loc>https://blogs.atomage.cn/posts/2023-07-19-go-memory-model/</loc>
     <lastmod>2023-07-19T13:10:33+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/tags/memory/</loc>
+    <loc>https://blogs.atomage.cn/tags/memory/</loc>
     <lastmod>2023-07-19T13:10:33+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/categories/network/</loc>
+    <loc>https://blogs.atomage.cn/categories/network/</loc>
     <lastmod>2023-07-12T22:12:14+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/tags/tcp/ip/</loc>
+    <loc>https://blogs.atomage.cn/tags/tcp/ip/</loc>
     <lastmod>2023-07-12T22:12:14+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/posts/2023-07-10-tcp-ip-protocol/</loc>
+    <loc>https://blogs.atomage.cn/posts/2023-07-10-tcp-ip-protocol/</loc>
     <lastmod>2023-07-12T22:12:14+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/tags/kubelet/</loc>
+    <loc>https://blogs.atomage.cn/tags/kubelet/</loc>
     <lastmod>2022-12-27T22:37:43+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/posts/2022-12-27-kubelet-statusmanager-mechanism-process-analysis/</loc>
+    <loc>https://blogs.atomage.cn/posts/2022-12-27-kubelet-statusmanager-mechanism-process-analysis/</loc>
     <lastmod>2022-12-27T22:37:43+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/categories/kubernetes/</loc>
+    <loc>https://blogs.atomage.cn/categories/kubernetes/</loc>
     <lastmod>2022-12-27T22:37:43+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/tags/kubernetes/</loc>
+    <loc>https://blogs.atomage.cn/tags/kubernetes/</loc>
     <lastmod>2022-12-27T22:37:43+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/posts/2022-12-23-kubelet-volumemanager-mechanism-process-analysis/</loc>
+    <loc>https://blogs.atomage.cn/posts/2022-12-23-kubelet-volumemanager-mechanism-process-analysis/</loc>
     <lastmod>2022-12-23T12:36:09+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/tags/volume/</loc>
+    <loc>https://blogs.atomage.cn/tags/volume/</loc>
     <lastmod>2022-12-23T12:36:09+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/posts/</loc>
+    <loc>https://blogs.atomage.cn/posts/</loc>
     <lastmod>2022-12-09T17:36:50+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/tags/development/</loc>
+    <loc>https://blogs.atomage.cn/tags/development/</loc>
     <lastmod>2022-12-09T17:36:50+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/tags/nginx/</loc>
+    <loc>https://blogs.atomage.cn/tags/nginx/</loc>
     <lastmod>2022-12-09T17:36:50+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/posts/2022-12-09-nginx-learning/</loc>
+    <loc>https://blogs.atomage.cn/posts/2022-12-09-nginx-learning/</loc>
     <lastmod>2022-12-09T17:36:50+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/archives/</loc>
+    <loc>https://blogs.atomage.cn/archives/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>http://localhost:62009/about/</loc>
+    <loc>https://blogs.atomage.cn/about/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>

@@ -2,87 +2,87 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Tags on Atomage&#39;s Blog</title>
-    <link>http://localhost:62009/tags/</link>
+    <link>https://blogs.atomage.cn/tags/</link>
     <description>Recent content in Tags on Atomage&#39;s Blog</description>
     <generator>Hugo</generator>
     <language>zh-cn</language>
     <lastBuildDate>Tue, 09 Dec 2025 11:51:25 +0800</lastBuildDate>
-    <atom:link href="http://localhost:62009/tags/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="https://blogs.atomage.cn/tags/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Inference</title>
-      <link>http://localhost:62009/tags/inference/</link>
+      <link>https://blogs.atomage.cn/tags/inference/</link>
       <pubDate>Tue, 09 Dec 2025 11:51:25 +0800</pubDate>
-      <guid>http://localhost:62009/tags/inference/</guid>
+      <guid>https://blogs.atomage.cn/tags/inference/</guid>
       <description></description>
     </item>
     <item>
       <title>Scheudle</title>
-      <link>http://localhost:62009/tags/scheudle/</link>
+      <link>https://blogs.atomage.cn/tags/scheudle/</link>
       <pubDate>Tue, 09 Dec 2025 11:51:25 +0800</pubDate>
-      <guid>http://localhost:62009/tags/scheudle/</guid>
+      <guid>https://blogs.atomage.cn/tags/scheudle/</guid>
       <description></description>
     </item>
     <item>
       <title>Vllm</title>
-      <link>http://localhost:62009/tags/vllm/</link>
+      <link>https://blogs.atomage.cn/tags/vllm/</link>
       <pubDate>Tue, 09 Dec 2025 11:51:25 +0800</pubDate>
-      <guid>http://localhost:62009/tags/vllm/</guid>
+      <guid>https://blogs.atomage.cn/tags/vllm/</guid>
       <description></description>
     </item>
     <item>
       <title>Go</title>
-      <link>http://localhost:62009/tags/go/</link>
+      <link>https://blogs.atomage.cn/tags/go/</link>
       <pubDate>Wed, 19 Jul 2023 13:10:33 +0800</pubDate>
-      <guid>http://localhost:62009/tags/go/</guid>
+      <guid>https://blogs.atomage.cn/tags/go/</guid>
       <description></description>
     </item>
     <item>
       <title>Memory</title>
-      <link>http://localhost:62009/tags/memory/</link>
+      <link>https://blogs.atomage.cn/tags/memory/</link>
       <pubDate>Wed, 19 Jul 2023 13:10:33 +0800</pubDate>
-      <guid>http://localhost:62009/tags/memory/</guid>
+      <guid>https://blogs.atomage.cn/tags/memory/</guid>
       <description></description>
     </item>
     <item>
       <title>TCP/IP</title>
-      <link>http://localhost:62009/tags/tcp/ip/</link>
+      <link>https://blogs.atomage.cn/tags/tcp/ip/</link>
       <pubDate>Wed, 12 Jul 2023 22:12:14 +0800</pubDate>
-      <guid>http://localhost:62009/tags/tcp/ip/</guid>
+      <guid>https://blogs.atomage.cn/tags/tcp/ip/</guid>
       <description></description>
     </item>
     <item>
       <title>Kubelet</title>
-      <link>http://localhost:62009/tags/kubelet/</link>
+      <link>https://blogs.atomage.cn/tags/kubelet/</link>
       <pubDate>Tue, 27 Dec 2022 22:37:43 +0800</pubDate>
-      <guid>http://localhost:62009/tags/kubelet/</guid>
+      <guid>https://blogs.atomage.cn/tags/kubelet/</guid>
       <description></description>
     </item>
     <item>
       <title>Kubernetes</title>
-      <link>http://localhost:62009/tags/kubernetes/</link>
+      <link>https://blogs.atomage.cn/tags/kubernetes/</link>
       <pubDate>Tue, 27 Dec 2022 22:37:43 +0800</pubDate>
-      <guid>http://localhost:62009/tags/kubernetes/</guid>
+      <guid>https://blogs.atomage.cn/tags/kubernetes/</guid>
       <description></description>
     </item>
     <item>
       <title>Volume</title>
-      <link>http://localhost:62009/tags/volume/</link>
+      <link>https://blogs.atomage.cn/tags/volume/</link>
       <pubDate>Fri, 23 Dec 2022 12:36:09 +0800</pubDate>
-      <guid>http://localhost:62009/tags/volume/</guid>
+      <guid>https://blogs.atomage.cn/tags/volume/</guid>
       <description></description>
     </item>
     <item>
       <title>Development</title>
-      <link>http://localhost:62009/tags/development/</link>
+      <link>https://blogs.atomage.cn/tags/development/</link>
       <pubDate>Fri, 09 Dec 2022 17:36:50 +0800</pubDate>
-      <guid>http://localhost:62009/tags/development/</guid>
+      <guid>https://blogs.atomage.cn/tags/development/</guid>
       <description></description>
     </item>
     <item>
       <title>Nginx</title>
-      <link>http://localhost:62009/tags/nginx/</link>
+      <link>https://blogs.atomage.cn/tags/nginx/</link>
       <pubDate>Fri, 09 Dec 2022 17:36:50 +0800</pubDate>
-      <guid>http://localhost:62009/tags/nginx/</guid>
+      <guid>https://blogs.atomage.cn/tags/nginx/</guid>
       <description></description>
     </item>
   </channel>
