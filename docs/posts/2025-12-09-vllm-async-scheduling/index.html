@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-cn">
-  <head>
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
@@ -67,7 +67,7 @@ def step(self) -&gt; tuple[dict[int, EngineCoreOutputs], bool]:
 
     
     
-    <meta property="og:url" content="https://blogs.atomage.cn/posts/2025-12-09-vllm-async-scheduling/">
+    <meta property="og:url" content="http://localhost:1313/posts/2025-12-09-vllm-async-scheduling/">
   <meta property="og:site_name" content="Atomage&#39;s Blog">
   <meta property="og:title" content="vllm 异步调度解析">
   <meta property="og:description" content="在vllm初始版本中只有一个同步调度策略，在该策略下GPU资源会在调度过程中形成空泡，造成GPU资源的浪费。vllm在v0.10.0版本后提供异步调度策略，并且在后续的迭代中不断加入多余其他特性的支持。原始PR内容可查看#19970 Implement Async Scheduling ，当前代码分析基于main branch(735284ed)。
@@ -103,7 +103,7 @@ def _process_engine_step(self) -&gt; bool: &#34;&#34;&#34;Called only when there
 
 
   
-  <header class="cover bg-top" style="background-image: url('https://blogs.atomage.cn/images/gohugo-default-sample-hero-image.jpg');">
+  <header class="cover bg-top" style="background-image: url('http://localhost:1313/images/gohugo-default-sample-hero-image.jpg');">
     <div class="bg-black-60">
       <nav class="pv3 ph3 ph4-ns" role="navigation">
   <div class="flex-l justify-between items-center center">
@@ -360,7 +360,7 @@ def _process_engine_step(self) -&gt; bool: &#34;&#34;&#34;Called only when there
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
       &copy;  Atomage's Blog  2022-2025 
     </a>
     <div>
