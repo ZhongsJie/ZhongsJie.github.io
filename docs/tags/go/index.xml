@@ -2,17 +2,17 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Go on Atomage&#39;s Blog</title>
-    <link>https://blogs.atomage.cn/tags/go/</link>
+    <link>http://localhost:55509/tags/go/</link>
     <description>Recent content in Go on Atomage&#39;s Blog</description>
     <generator>Hugo</generator>
     <language>zh-cn</language>
     <lastBuildDate>Wed, 19 Jul 2023 13:10:33 +0800</lastBuildDate>
-    <atom:link href="https://blogs.atomage.cn/tags/go/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="http://localhost:55509/tags/go/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Go 内存模型与分配机制</title>
-      <link>https://blogs.atomage.cn/posts/2023-07-19-go-memory-model/</link>
+      <link>http://localhost:55509/posts/2023-07-19-go-memory-model/</link>
       <pubDate>Wed, 19 Jul 2023 13:10:33 +0800</pubDate>
-      <guid>https://blogs.atomage.cn/posts/2023-07-19-go-memory-model/</guid>
+      <guid>http://localhost:55509/posts/2023-07-19-go-memory-model/</guid>
       <description>&lt;blockquote&gt;&#xA;&lt;p&gt;Go内存模型指定了一个goroutine中变量的读取条件，可以保证观察不同goroutine中对同一变量的写入产生的值。&lt;/p&gt;&lt;/blockquote&gt;&#xA;&lt;h2 id=&#34;虚拟内存&#34;&gt;&#xA;    虚拟内存&lt;a class=&#34;hash-link&#34; href=&#34;#%e8%99%9a%e6%8b%9f%e5%86%85%e5%ad%98&#34; title=&#34;Direct link to heading&#34;&gt;#&lt;/a&gt;&#xA;&lt;/h2&gt;&lt;blockquote&gt;&#xA;&lt;p&gt;虚拟内存技术是操作系统实现的一种高效的物理内存管理方式&lt;/p&gt;&lt;/blockquote&gt;&#xA;&lt;p&gt;&lt;img src=&#34;../../images/2023-07/%E8%99%9A%E6%8B%9F%E5%9C%B0%E5%9D%80.png&#34; alt=&#34;image-20200720222628264&#34;&gt;&lt;/p&gt;&#xA;&lt;ul&gt;&#xA;&lt;li&gt;虚拟内存通过&lt;strong&gt;页表&lt;/strong&gt;映射到物理内存上，页表记录是否在物理内存上（&lt;strong&gt;有效位&lt;/strong&gt;），以及物理内存页的地址&lt;/li&gt;&#xA;&lt;li&gt;操作系统为每个进程提供了一个独立的页表，因此也就是一个独立的虚拟空间地址，多个虚拟页面可以映射到同一个共享物理页面上。&lt;/li&gt;&#xA;&lt;li&gt;&lt;strong&gt;地址翻译&lt;/strong&gt;：一个N元素的虚拟地址空间的元素和一个M元素的物理地址空间中元素之间的映射&lt;/li&gt;&#xA;&lt;li&gt;虚拟内存：利用磁盘空间&lt;strong&gt;虚拟出一块逻辑内存&lt;/strong&gt;，用作虚拟内存的磁盘空间被称为交换空间&lt;/li&gt;&#xA;&lt;/ul&gt;&#xA;&lt;ol&gt;&#xA;&lt;li&gt;操作系统内存管理中，一个重要概念虚拟内存:&#xA;&lt;ul&gt;&#xA;&lt;li&gt;扩大地址空间&lt;/li&gt;&#xA;&lt;li&gt;内存保护&lt;/li&gt;&#xA;&lt;li&gt;公平内存分配&lt;/li&gt;&#xA;&lt;li&gt;当进程通信时，可采用虚存共享的方式实现&lt;/li&gt;&#xA;&lt;li&gt;不需要在实际物理内存的连续空间，**可以利用碎片&lt;/li&gt;&#xA;&lt;/ul&gt;&#xA;&lt;/li&gt;&#xA;&lt;li&gt;虚拟内存的&lt;strong&gt;代价&lt;/strong&gt;：&#xA;&lt;ul&gt;&#xA;&lt;li&gt;管理需要建立很多数据结构，占用额外的内存&lt;/li&gt;&#xA;&lt;li&gt;虚拟地址到物理地址的转换，增加了指令的执行时间&lt;/li&gt;&#xA;&lt;li&gt;页面的换入换出需要磁盘I/O&lt;/li&gt;&#xA;&lt;li&gt;一页中只有部分数据，会浪费内存&lt;/li&gt;&#xA;&lt;/ul&gt;&#xA;&lt;/li&gt;&#xA;&lt;/ol&gt;&#xA;&lt;h2 id=&#34;go内存模型&#34;&gt;&#xA;    Go内存模型&lt;a class=&#34;hash-link&#34; href=&#34;#go%e5%86%85%e5%ad%98%e6%a8%a1%e5%9e%8b&#34; title=&#34;Direct link to heading&#34;&gt;#&lt;/a&gt;&#xA;&lt;/h2&gt;&lt;blockquote&gt;&#xA;&lt;p&gt;参考&lt;a href=&#34;https://github.com/google/tcmalloc/blob/master/docs/design.md&#34;&gt;tcmalloc&lt;/a&gt;设计，「修改由多个goroutine同时访问的数据的程序必须序列化这种访问。 要序列化访问，请使用channel操作或其他同步原语（sync和sync/atomic）保护数据。 别自作聪明。」&lt;/p&gt;</description>
     </item>
   </channel>
