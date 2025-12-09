@@ -4,6 +4,7 @@ title: Atomage's Blog
 theme: 'ananke' # 主题
 disqusShortname: '' # 添加disqusShortname参数，留空表示禁用
 publishDir: "docs"
+relativeURLs: true # 使用相对路径
 
 enableEmoji: true # 允许使用 Emoji 表情
 
@@ -24,6 +25,8 @@ params:
   featured_image: "/images/gohugo-default-sample-hero-image.jpg"
   recent_posts_number: 8
   description: "分界"
+  favicon: "/images/logo.svg"
+  site_logo: "/images/site-logo.svg"
 
 sitemap:
   changefreq: "monthly"

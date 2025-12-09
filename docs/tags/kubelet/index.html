@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-cn">
-  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
@@ -16,7 +16,7 @@
     
 
     
-<link rel="stylesheet" href="/ananke/css/main.min.css" >
+<link rel="stylesheet" href="../../ananke/css/main.min.css" >
 
 
 
@@ -24,17 +24,19 @@
     
     
       
+<link rel="shortcut icon" href="../../images/logo.svg" type="image/x-icon" />
+
 
     
 
     
     
-      <link href="/tags/kubelet/index.xml" rel="alternate" type="application/rss+xml" title="Atomage&#39;s Blog" />
-      <link href="/tags/kubelet/index.xml" rel="feed" type="application/rss+xml" title="Atomage&#39;s Blog" />
+      <link href="../../tags/kubelet/index.xml" rel="alternate" type="application/rss+xml" title="Atomage&#39;s Blog" />
+      <link href="../../tags/kubelet/index.xml" rel="feed" type="application/rss+xml" title="Atomage&#39;s Blog" />
       
     
     
-    <meta property="og:url" content="http://localhost:1313/tags/kubelet/">
+    <meta property="og:url" content="https://blogs.atomage.cn/tags/kubelet/">
   <meta property="og:site_name" content="Atomage&#39;s Blog">
   <meta property="og:title" content="Kubelet">
   <meta property="og:description" content="分界">
@@ -57,15 +59,15 @@
     
 
   
-  <header class="cover bg-top" style="background-image: url('http://localhost:1313/images/gohugo-default-sample-hero-image.jpg'); background-size: cover; background-position: center;">
+  <header class="cover bg-top" style="background-image: url('https://blogs.atomage.cn/images/gohugo-default-sample-hero-image.jpg'); background-size: cover; background-position: center;">
     
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
     <div class="bg-black-60">
       <nav class="pv3 ph3 ph4-ns" role="navigation">
   <div class="flex-l justify-between items-center center">
-    <a href="/" class="f3 fw2 hover-white no-underline white-90 dib">
+    <a href="../../" class="f3 fw2 hover-white no-underline white-90 dib">
       
-        Atomage&#39;s Blog
+        <img src="../../images/site-logo.svg" class="w100 mw5-ns" alt="Atomage&#39;s Blog" />
       
     </a>
     <div class="flex-l items-center">
@@ -75,19 +77,19 @@
         <ul class="pl0 mr3">
           
           <li class="list f5 f4-ns fw4 dib pr3">
-            <a class="hover-white no-underline white-90" href="/archives/" title="⏱️Archives page">
+            <a class="hover-white no-underline white-90" href="../../archives/" title="⏱️Archives page">
               ⏱️Archives
             </a>
           </li>
           
           <li class="list f5 f4-ns fw4 dib pr3">
-            <a class="hover-white no-underline white-90" href="/posts/" title="📎Posts page">
+            <a class="hover-white no-underline white-90" href="../../posts/" title="📎Posts page">
               📎Posts
             </a>
           </li>
           
           <li class="list f5 f4-ns fw4 dib pr3">
-            <a class="hover-white no-underline white-90" href="/about/" title="🙋🏻‍♂️About page">
+            <a class="hover-white no-underline white-90" href="../../about/" title="🙋🏻‍♂️About page">
               🙋🏻‍♂️About
             </a>
           </li>
@@ -141,7 +143,7 @@
   <div class="bg-white mb3 pa4 gray overflow-hidden">
     <span class="f6 db truncate">📎Posts</span>
     <h1 class="f3 near-black truncate">
-      <a href="/posts/2022-12-27-kubelet-statusmanager-mechanism-process-analysis/" class="link black dim">
+      <a href="../../posts/2022-12-27-kubelet-statusmanager-mechanism-process-analysis/" class="link black dim">
         Kubelet StatusManager机制流程分析
       </a>
     </h1>
@@ -150,7 +152,7 @@
     Kubelet StatusManager机制流程分析<a class="hash-link" href="#kubelet-statusmanager%e6%9c%ba%e5%88%b6%e6%b5%81%e7%a8%8b%e5%88%86%e6%9e%90" title="Direct link to heading">#</a>
 </h2><blockquote>
 <p>主要功能将Pod状态信息同步到ApiServer，并不会主动监控Pod状态，提供接口供其他Manager调用，当其他组件需要改变 pod 的状态时会将 pod 的 status 信息发送到 statusManager 进行同步。主要使用方<code>probeManager</code>，<code>podWorkers</code></p></blockquote>
-<p><img src="/images/2022-12/image-StatusManager.png" alt="StatusManager"></p>
+<p><img src="../../images/2022-12/image-StatusManager.png" alt="StatusManager"></p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">manager</span> <span style="color:#66d9ef">struct</span> {  
 </span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">kubeClient</span> <span style="color:#a6e22e">clientset</span>.<span style="color:#a6e22e">Interface</span>  
 </span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">podManager</span> <span style="color:#a6e22e">kubepod</span>.<span style="color:#a6e22e">Manager</span>  
@@ -250,7 +252,7 @@
   <div class="bg-white mb3 pa4 gray overflow-hidden">
     <span class="f6 db truncate">📎Posts</span>
     <h1 class="f3 near-black truncate">
-      <a href="/posts/2022-12-23-kubelet-volumemanager-mechanism-process-analysis/" class="link black dim">
+      <a href="../../posts/2022-12-23-kubelet-volumemanager-mechanism-process-analysis/" class="link black dim">
         Kubelet VolumeManager机制流程分析
       </a>
     </h1>
@@ -259,7 +261,7 @@
     Kubelet VolumeManager机制流程分析<a class="hash-link" href="#kubelet-volumemanager%e6%9c%ba%e5%88%b6%e6%b5%81%e7%a8%8b%e5%88%86%e6%9e%90" title="Direct link to heading">#</a>
 </h2><blockquote>
 <p>Kubelet Volume相关逻辑主要在VolumeManager模块</p></blockquote>
-<p><img src="/images/2022-12/image-volumemanager.png" alt="VolumeManager"></p>
+<p><img src="../../images/2022-12/image-volumemanager.png" alt="VolumeManager"></p>
 <ol>
 <li>Mount 阶段则由对应节点的 kubelet 中的 volume manager 处理。</li>
 <li>volume manager 获取 node.Status.VolumesAttached 属性值，发现 volume 已被标记为 attached, 就会进行 mount 操作</li>
@@ -288,7 +290,7 @@
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
       &copy;  Atomage's Blog  2022-2025 
     </a>
     <div>

@@ -2,38 +2,38 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Categories on Atomage&#39;s Blog</title>
-    <link>http://localhost:1313/categories/</link>
+    <link>https://blogs.atomage.cn/categories/</link>
     <description>Recent content in Categories on Atomage&#39;s Blog</description>
     <generator>Hugo</generator>
     <language>zh-cn</language>
     <lastBuildDate>Tue, 09 Dec 2025 11:51:25 +0800</lastBuildDate>
-    <atom:link href="http://localhost:1313/categories/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="https://blogs.atomage.cn/categories/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Vllm</title>
-      <link>http://localhost:1313/categories/vllm/</link>
+      <link>https://blogs.atomage.cn/categories/vllm/</link>
       <pubDate>Tue, 09 Dec 2025 11:51:25 +0800</pubDate>
-      <guid>http://localhost:1313/categories/vllm/</guid>
+      <guid>https://blogs.atomage.cn/categories/vllm/</guid>
       <description></description>
     </item>
     <item>
       <title>Go</title>
-      <link>http://localhost:1313/categories/go/</link>
+      <link>https://blogs.atomage.cn/categories/go/</link>
       <pubDate>Wed, 19 Jul 2023 13:10:33 +0800</pubDate>
-      <guid>http://localhost:1313/categories/go/</guid>
+      <guid>https://blogs.atomage.cn/categories/go/</guid>
       <description></description>
     </item>
     <item>
       <title>Network</title>
-      <link>http://localhost:1313/categories/network/</link>
+      <link>https://blogs.atomage.cn/categories/network/</link>
       <pubDate>Wed, 12 Jul 2023 22:12:14 +0800</pubDate>
-      <guid>http://localhost:1313/categories/network/</guid>
+      <guid>https://blogs.atomage.cn/categories/network/</guid>
       <description></description>
     </item>
     <item>
       <title>Kubernetes</title>
-      <link>http://localhost:1313/categories/kubernetes/</link>
+      <link>https://blogs.atomage.cn/categories/kubernetes/</link>
       <pubDate>Tue, 27 Dec 2022 22:37:43 +0800</pubDate>
-      <guid>http://localhost:1313/categories/kubernetes/</guid>
+      <guid>https://blogs.atomage.cn/categories/kubernetes/</guid>
       <description></description>
     </item>
   </channel>
