@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-cn">
-  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=55509&amp;path=livereload" data-no-instant defer></script>
+  <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
@@ -36,7 +36,7 @@
       
     
     
-    <meta property="og:url" content="http://localhost:55509/tags/vllm/">
+    <meta property="og:url" content="https://blogs.atomage.cn/tags/vllm/">
   <meta property="og:site_name" content="Atomage&#39;s Blog">
   <meta property="og:title" content="Vllm">
   <meta property="og:description" content="分界">
@@ -145,8 +145,8 @@
       </a>
     </h1>
     <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
-      <blockquote>
-<p>在vllm初始版本中只有一个同步调度策略，在该策略下GPU资源会在调度过程中形成空泡，造成GPU资源的浪费。vllm在v0.10.0版本后提供异步调度策略，并且在后续的迭代中不断加入多余其他特性的支持。原始PR内容可查看<a href="https://github.com/vllm-project/vllm/pull/19970">#19970 Implement Async Scheduling </a>，当前代码分析基于main branch(735284ed)。</p></blockquote>
+      <p>在vllm初始版本中只有一个同步调度策略，在该策略下GPU资源会在调度过程中形成空泡，造成GPU资源的浪费。vllm在v0.10.0版本后提供异步调度策略，并且在后续的迭代中不断加入对于其他特性（例如异步场景下的投机解码）的支持。原始PR内容可查看<a href="https://github.com/vllm-project/vllm/pull/19970">#19970 Implement Async Scheduling </a>，当前代码分析基于<code>main branch(735284ed)</code>。</p>
+<p>EngineCore处理处理Step逻辑：</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_process_engine_step</span>(self) <span style="color:#f92672">-&gt;</span> bool:
 </span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;&#34;&#34;Called only when there are unfinished local requests.&#34;&#34;&#34;</span>
 </span></span><span style="display:flex;"><span>
@@ -166,11 +166,13 @@
 </span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">return</span> {}, <span style="color:#66d9ef">False</span>
 </span></span><span style="display:flex;"><span>  
 </span></span><span style="display:flex;"><span>  scheduler_output <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>schedule()
-</span></span><span style="display:flex;"><span>  <span style="color:#75715e"># 通过FutureWrapper进行异步包装</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e"># 通过FutureWrapper进行异步包装（复用异步调度的部分逻辑， 在同步调度逻辑里面会等待结果返回）</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e"># </span>
 </span></span><span style="display:flex;"><span>  future <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>model_executor<span style="color:#f92672">.</span>execute_model(scheduler_output, non_block<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>)
 </span></span><span style="display:flex;"><span>  <span style="color:#75715e"># 用于支持结构化输出等</span>
 </span></span><span style="display:flex;"><span>  grammar_output <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>get_grammar_bitmask(scheduler_output)
 </span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">with</span> self<span style="color:#f92672">.</span>log_error_detail(scheduler_output):
+</span></span><span style="display:flex;"><span>	  <span style="color:#75715e"># 同步</span>
 </span></span><span style="display:flex;"><span>      model_output <span style="color:#f92672">=</span> future<span style="color:#f92672">.</span>result()
 </span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> model_output <span style="color:#f92672">is</span> <span style="color:#66d9ef">None</span>:
 </span></span><span style="display:flex;"><span>          model_output <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>model_executor<span style="color:#f92672">.</span>sample_tokens(grammar_output)
@@ -181,9 +183,8 @@
 </span></span><span style="display:flex;"><span>      scheduler_output, model_output
 </span></span><span style="display:flex;"><span>  )
 </span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> engine_core_outputs, scheduler_output<span style="color:#f92672">.</span>total_num_scheduled_tokens <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>
-</span></span></code></pre></div><blockquote>
-<p>同步调度步骤：
-调度 -&gt; 调度结果做前向推理 -&gt; 推理后的结果用来采样并更新调度器</p>
+</span></span></code></pre></div><p><img src="../../images/2025-12/sync-scheduling.png" alt="sync-scheduling.png">
+同步调度步骤：</p>
     </div>
   </div>
 </div>
@@ -196,7 +197,7 @@
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:55509/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
       &copy;  Atomage's Blog  2022-2025 
     </a>
     <div>
