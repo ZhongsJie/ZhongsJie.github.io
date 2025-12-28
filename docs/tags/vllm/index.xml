@@ -6,8 +6,15 @@
     <description>Recent content in Vllm on Atomage&#39;s Blog</description>
     <generator>Hugo</generator>
     <language>zh-cn</language>
-    <lastBuildDate>Tue, 09 Dec 2025 11:51:25 +0800</lastBuildDate>
+    <lastBuildDate>Sun, 28 Dec 2025 21:15:37 +0800</lastBuildDate>
     <atom:link href="https://blogs.atomage.cn/tags/vllm/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>vllm DP (Data Parallel)</title>
+      <link>https://blogs.atomage.cn/posts/2025-12-28-data-parallel/</link>
+      <pubDate>Sun, 28 Dec 2025 21:15:37 +0800</pubDate>
+      <guid>https://blogs.atomage.cn/posts/2025-12-28-data-parallel/</guid>
+      <description>&lt;h2 id=&#34;dp基本概念&#34;&gt;&#xA;    DP基本概念&lt;a class=&#34;hash-link&#34; href=&#34;#dp%e5%9f%ba%e6%9c%ac%e6%a6%82%e5%bf%b5&#34; title=&#34;Direct link to heading&#34;&gt;#&lt;/a&gt;&#xA;&lt;/h2&gt;&lt;blockquote&gt;&#xA;&lt;p&gt;DP在推理场景下的核心思想，在多个 GPU/节点上完整复制同一个模型权重，每个副本独立处理不同的请求或批次，从而&lt;strong&gt;近似线性提升吞吐&lt;/strong&gt;。与训练中的 DP 需要梯度聚合不同，推理 DP 没有参数同步，通信负担主要来自调度、路由、指标与可选的缓存协同。&lt;/p&gt;&lt;/blockquote&gt;&#xA;&lt;p&gt;具体来说&lt;/p&gt;&#xA;&lt;ul&gt;&#xA;&lt;li&gt;每个 GPU/设备都拥有模型的完整副本&lt;/li&gt;&#xA;&lt;li&gt;输入数据被分割成多个批次，通过负载均衡分配给不同设备&lt;/li&gt;&#xA;&lt;li&gt;各设备独立进行前向推理&lt;/li&gt;&#xA;&lt;li&gt;每个设备产生各自批次的输出结果&lt;/li&gt;&#xA;&lt;/ul&gt;&#xA;&lt;p&gt;在DP部署方式下由于单卡的计算效率基本保持不变，因此&lt;strong&gt;吞吐提升近似是线性&lt;/strong&gt;：理论上2 张卡就是 2 倍吞吐，4 张卡就是 4 倍，以此类推。&lt;/p&gt;&#xA;&lt;p&gt;在大规模部署DP的时候，由于整体可支持的吞吐翻倍，API服务器需要面临成倍的压力，因此&lt;strong&gt;API服务器（Tokenize等预处理）可能会成为系统瓶颈&lt;/strong&gt;。vllm可以使用&lt;code&gt;--api-server-count&lt;/code&gt;命令行选项来扩展，最终暴露给用户的是一个Endpoint，在内部实现API服务器的扩展。&lt;/p&gt;</description>
+    </item>
     <item>
       <title>vllm 异步调度解析</title>
       <link>https://blogs.atomage.cn/posts/2025-12-09-vllm-async-scheduling/</link>

@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    
+    <title>vllm DP (Data Parallel) | Atomage&#39;s Blog</title>
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="description" content="
+    DP基本概念#
+
+DP在推理场景下的核心思想，在多个 GPU/节点上完整复制同一个模型权重，每个副本独立处理不同的请求或批次，从而近似线性提升吞吐。与训练中的 DP 需要梯度聚合不同，推理 DP 没有参数同步，通信负担主要来自调度、路由、指标与可选的缓存协同。
+具体来说
+
+每个 GPU/设备都拥有模型的完整副本
+输入数据被分割成多个批次，通过负载均衡分配给不同设备
+各设备独立进行前向推理
+每个设备产生各自批次的输出结果
+
+在DP部署方式下由于单卡的计算效率基本保持不变，因此吞吐提升近似是线性：理论上2 张卡就是 2 倍吞吐，4 张卡就是 4 倍，以此类推。
+在大规模部署DP的时候，由于整体可支持的吞吐翻倍，API服务器需要面临成倍的压力，因此API服务器（Tokenize等预处理）可能会成为系统瓶颈。vllm可以使用--api-server-count命令行选项来扩展，最终暴露给用户的是一个Endpoint，在内部实现API服务器的扩展。">
+    <meta name="generator" content="Hugo 0.145.0">
+    
+    
+    
+    
+      <meta name="robots" content="noindex, nofollow">
+    
+
+    
+<link rel="stylesheet" href="../../ananke/css/main.min.css" >
+
+
+
+    
+    
+    
+      
+<link rel="shortcut icon" href="../../images/logo.svg" type="image/x-icon" />
+
+
+    
+
+    
+    
+    <meta property="og:url" content="https://blogs.atomage.cn/posts/2025-12-28-data-parallel/">
+  <meta property="og:site_name" content="Atomage&#39;s Blog">
+  <meta property="og:title" content="vllm DP (Data Parallel)">
+  <meta property="og:description" content="DP基本概念# DP在推理场景下的核心思想，在多个 GPU/节点上完整复制同一个模型权重，每个副本独立处理不同的请求或批次，从而近似线性提升吞吐。与训练中的 DP 需要梯度聚合不同，推理 DP 没有参数同步，通信负担主要来自调度、路由、指标与可选的缓存协同。
+具体来说
+每个 GPU/设备都拥有模型的完整副本 输入数据被分割成多个批次，通过负载均衡分配给不同设备 各设备独立进行前向推理 每个设备产生各自批次的输出结果 在DP部署方式下由于单卡的计算效率基本保持不变，因此吞吐提升近似是线性：理论上2 张卡就是 2 倍吞吐，4 张卡就是 4 倍，以此类推。
+在大规模部署DP的时候，由于整体可支持的吞吐翻倍，API服务器需要面临成倍的压力，因此API服务器（Tokenize等预处理）可能会成为系统瓶颈。vllm可以使用--api-server-count命令行选项来扩展，最终暴露给用户的是一个Endpoint，在内部实现API服务器的扩展。">
+  <meta property="og:locale" content="zh_cn">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-12-28T21:15:37+08:00">
+    <meta property="article:modified_time" content="2025-12-28T21:15:37+08:00">
+    <meta property="article:tag" content="Parallel">
+    <meta property="article:tag" content="Vllm">
+    <meta property="article:tag" content="Inference">
+
+  <meta itemprop="name" content="vllm DP (Data Parallel)">
+  <meta itemprop="description" content="DP基本概念# DP在推理场景下的核心思想，在多个 GPU/节点上完整复制同一个模型权重，每个副本独立处理不同的请求或批次，从而近似线性提升吞吐。与训练中的 DP 需要梯度聚合不同，推理 DP 没有参数同步，通信负担主要来自调度、路由、指标与可选的缓存协同。
+具体来说
+每个 GPU/设备都拥有模型的完整副本 输入数据被分割成多个批次，通过负载均衡分配给不同设备 各设备独立进行前向推理 每个设备产生各自批次的输出结果 在DP部署方式下由于单卡的计算效率基本保持不变，因此吞吐提升近似是线性：理论上2 张卡就是 2 倍吞吐，4 张卡就是 4 倍，以此类推。
+在大规模部署DP的时候，由于整体可支持的吞吐翻倍，API服务器需要面临成倍的压力，因此API服务器（Tokenize等预处理）可能会成为系统瓶颈。vllm可以使用--api-server-count命令行选项来扩展，最终暴露给用户的是一个Endpoint，在内部实现API服务器的扩展。">
+  <meta itemprop="datePublished" content="2025-12-28T21:15:37+08:00">
+  <meta itemprop="dateModified" content="2025-12-28T21:15:37+08:00">
+  <meta itemprop="wordCount" content="2026">
+  <meta itemprop="keywords" content="Parallel,Vllm,Inference">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="vllm DP (Data Parallel)">
+  <meta name="twitter:description" content="DP基本概念# DP在推理场景下的核心思想，在多个 GPU/节点上完整复制同一个模型权重，每个副本独立处理不同的请求或批次，从而近似线性提升吞吐。与训练中的 DP 需要梯度聚合不同，推理 DP 没有参数同步，通信负担主要来自调度、路由、指标与可选的缓存协同。
+具体来说
+每个 GPU/设备都拥有模型的完整副本 输入数据被分割成多个批次，通过负载均衡分配给不同设备 各设备独立进行前向推理 每个设备产生各自批次的输出结果 在DP部署方式下由于单卡的计算效率基本保持不变，因此吞吐提升近似是线性：理论上2 张卡就是 2 倍吞吐，4 张卡就是 4 倍，以此类推。
+在大规模部署DP的时候，由于整体可支持的吞吐翻倍，API服务器需要面临成倍的压力，因此API服务器（Tokenize等预处理）可能会成为系统瓶颈。vllm可以使用--api-server-count命令行选项来扩展，最终暴露给用户的是一个Endpoint，在内部实现API服务器的扩展。">
+
+	
+  </head>
+
+  <body class="ma0 avenir bg-near-white">
+
+    
+
+
+
+  <header>
+    <div class="bg-black">
+      <nav class="pv3 ph3 ph4-ns" role="navigation">
+  <div class="flex-l justify-between items-center center">
+    <a href="../../" class="f3 fw2 hover-white no-underline white-90 dib">
+      
+        <img src="../../images/site-logo.svg" class="w100 mw5-ns" alt="Atomage&#39;s Blog" />
+      
+    </a>
+    <div class="flex-l items-center">
+      
+
+      
+        <ul class="pl0 mr3">
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="../../archives/" title="⏱️Archives page">
+              ⏱️Archives
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="../../posts/" title="📎Posts page">
+              📎Posts
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="../../about/" title="🙋🏻‍♂️About page">
+              🙋🏻‍♂️About
+            </a>
+          </li>
+          
+        </ul>
+      
+      
+<div class="ananke-socials">
+  
+    
+    <a href="https://github.com/ZhongsJie" target="_blank" rel="noopener" class="github ananke-social-link link-transition stackoverflow link dib z-999 pt3 pt0-l mr1" title="GitHub link" aria-label="follow on GitHub——Opens in a new window">
+      
+        <span class="icon"><svg style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+</span>
+      
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;"/>
+</svg>
+</span></a>
+  
+</div>
+
+    </div>
+  </div>
+</nav>
+
+    </div>
+  </header>
+
+
+
+    <main class="pb7" role="main">
+      
+
+<article class="flex-l flex-wrap justify-between mw8 center ph3">
+  <header class="mt4 w-100">
+    <aside class="instapaper_ignoref b helvetica tracked">
+      
+      📎POSTS
+    </aside>
+    
+
+
+
+
+
+
+
+
+
+
+  <div id="sharing" class="mt3 ananke-socials">
+    
+  </div>
+
+
+    <h1 class="f1 athelas mt3 mb1">vllm DP (Data Parallel)</h1>
+    
+    <p class="tracked">
+      By <strong>
+        
+        ZhongsJie
+        
+      </strong>
+    </p>
+    
+    
+    <time class="f6 mv4 dib tracked" datetime="2025-12-28T21:15:37+08:00" >December 28, 2025</time>
+
+    
+    
+    <span class="f6 mv4 dib tracked"> - 5 minutes read</span>
+    <span class="f6 mv4 dib tracked"> - 2026 words</span>
+    
+  </header>
+  <div class="nested-copy-line-height lh-copy serif f4 nested-links
+    nested-img mid-gray pr4-l w-100-l"><h2 id="dp基本概念">
+    DP基本概念<a class="hash-link" href="#dp%e5%9f%ba%e6%9c%ac%e6%a6%82%e5%bf%b5" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>DP在推理场景下的核心思想，在多个 GPU/节点上完整复制同一个模型权重，每个副本独立处理不同的请求或批次，从而<strong>近似线性提升吞吐</strong>。与训练中的 DP 需要梯度聚合不同，推理 DP 没有参数同步，通信负担主要来自调度、路由、指标与可选的缓存协同。</p></blockquote>
+<p>具体来说</p>
+<ul>
+<li>每个 GPU/设备都拥有模型的完整副本</li>
+<li>输入数据被分割成多个批次，通过负载均衡分配给不同设备</li>
+<li>各设备独立进行前向推理</li>
+<li>每个设备产生各自批次的输出结果</li>
+</ul>
+<p>在DP部署方式下由于单卡的计算效率基本保持不变，因此<strong>吞吐提升近似是线性</strong>：理论上2 张卡就是 2 倍吞吐，4 张卡就是 4 倍，以此类推。</p>
+<p>在大规模部署DP的时候，由于整体可支持的吞吐翻倍，API服务器需要面临成倍的压力，因此<strong>API服务器（Tokenize等预处理）可能会成为系统瓶颈</strong>。vllm可以使用<code>--api-server-count</code>命令行选项来扩展，最终暴露给用户的是一个Endpoint，在内部实现API服务器的扩展。</p>
+<p><img src="../../images/2025-12/data-parallel.png" alt="data-parallel.png"></p>
+<h2 id="vllm-项目代码实现">
+    vllm 项目代码实现<a class="hash-link" href="#vllm-%e9%a1%b9%e7%9b%ae%e4%bb%a3%e7%a0%81%e5%ae%9e%e7%8e%b0" title="Direct link to heading">#</a>
+</h2><p>代码分析基于<code>vllm main branch(735284ed8)</code></p>
+<blockquote>
+<p><code>dp-size</code> （数据并行大小）通过 <code>parallel_config.data_parallel_size</code> 配置，决定了需要启动的 engine-core 数量。</p></blockquote>
+<pre tabindex="0"><code>假设：8 张 GPU，DP=2 (2 个数据并行组，每组 4 张卡)
+┌─────────────────┐  ┌─────────────────┐
+│  DP Group 0     │  │  DP Group 1     │
+└─────────────────┘  └─────────────────┘
+    处理 Batch A        处理 Batch B
+</code></pre><h3 id="1-主要相关文件">
+    1. 主要相关文件<a class="hash-link" href="#1-%e4%b8%bb%e8%a6%81%e7%9b%b8%e5%85%b3%e6%96%87%e4%bb%b6" title="Direct link to heading">#</a>
+</h3><ul>
+<li><code>/vllm/vllm/v1/engine/utils.py</code> ：包含启动 engine-core 进程的核心逻辑</li>
+<li><code>/vllm/vllm/v1/engine/core_client.py</code> ：创建和管理 engine-core 客户端</li>
+<li><code>/vllm/vllm/v1/engine/core.py</code> ：EngineCore 类的具体实现</li>
+</ul>
+<h3 id="2-启动流程">
+    2. 启动流程<a class="hash-link" href="#2-%e5%90%af%e5%8a%a8%e6%b5%81%e7%a8%8b" title="Direct link to heading">#</a>
+</h3><h4 id="21-启动函数-launch_core_engines">
+    2.1 启动函数 launch_core_engines<a class="hash-link" href="#21-%e5%90%af%e5%8a%a8%e5%87%bd%e6%95%b0-launch_core_engines" title="Direct link to heading">#</a>
+</h4><p>在 utils.py 中的 <code>launch_core_engines</code> 函数是启动 engine-core 的主要入口点。当<code>dp_size &gt; 1</code> 时，会启动一个 <code>DPCoordinator</code> 进程来协调各个 engine-core。sglang中通过<code>DataParallelController</code>管理<code>sglang scheduler</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">launch_core_engines</span>(
+</span></span><span style="display:flex;"><span>    vllm_config: VllmConfig,
+</span></span><span style="display:flex;"><span>    executor_class: type[Executor],
+</span></span><span style="display:flex;"><span>    log_stats: bool,
+</span></span><span style="display:flex;"><span>    num_api_servers: int <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>,
+</span></span><span style="display:flex;"><span>) <span style="color:#f92672">-&gt;</span> Iterator[
+</span></span><span style="display:flex;"><span>    tuple[
+</span></span><span style="display:flex;"><span>        CoreEngineProcManager <span style="color:#f92672">|</span> CoreEngineActorManager <span style="color:#f92672">|</span> <span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>        DPCoordinator <span style="color:#f92672">|</span> <span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>        EngineZmqAddresses,
+</span></span><span style="display:flex;"><span>    ]
+</span></span><span style="display:flex;"><span>]:
+</span></span><span style="display:flex;"><span>	<span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e"># 设置协调器的ZMQ地址</span>
+</span></span><span style="display:flex;"><span>	addresses <span style="color:#f92672">=</span> EngineZmqAddresses(
+</span></span><span style="display:flex;"><span>        inputs<span style="color:#f92672">=</span>[
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># 当 local_only=True 时，生成IPC（本地进程间通信）路径，适用于所有组件在同一台机器上的情况</span>
+</span></span><span style="display:flex;"><span>			<span style="color:#75715e"># 当 local_only=False 时，生成TCP URI，适用于组件分布在不同机器上的分布式部署</span>
+</span></span><span style="display:flex;"><span>            get_engine_client_zmq_addr(client_local_only, host)
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">for</span> _ <span style="color:#f92672">in</span> range(num_api_servers)
+</span></span><span style="display:flex;"><span>        ],
+</span></span><span style="display:flex;"><span>        outputs<span style="color:#f92672">=</span>[
+</span></span><span style="display:flex;"><span>            get_engine_client_zmq_addr(client_local_only, host)
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">for</span> _ <span style="color:#f92672">in</span> range(num_api_servers)
+</span></span><span style="display:flex;"><span>        ],
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> run_coordinator:
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># DPCoordinator 主要用于连接前端API Server 和EngineCore</span>
+</span></span><span style="display:flex;"><span>        coordinator <span style="color:#f92672">=</span> DPCoordinator(parallel_config)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e"># 用于DPCoordinator 和EngineCore相互间通信</span>
+</span></span><span style="display:flex;"><span>        addresses<span style="color:#f92672">.</span>coordinator_input, addresses<span style="color:#f92672">.</span>coordinator_output <span style="color:#f92672">=</span> (
+</span></span><span style="display:flex;"><span>            coordinator<span style="color:#f92672">.</span>get_engine_socket_addresses()
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 前端发布地址，用于DPCoordinator向API服务器（前端进程）发布统计信息和状态</span>
+</span></span><span style="display:flex;"><span>        addresses<span style="color:#f92672">.</span>frontend_stats_publish_address <span style="color:#f92672">=</span> (
+</span></span><span style="display:flex;"><span>            coordinator<span style="color:#f92672">.</span>get_stats_publish_address()
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">with</span> zmq_socket_ctx(
+</span></span><span style="display:flex;"><span>        local_handshake_address, zmq<span style="color:#f92672">.</span>ROUTER, bind<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>
+</span></span><span style="display:flex;"><span>    ) <span style="color:#66d9ef">as</span> handshake_socket:
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">from</span> vllm.v1.engine.core <span style="color:#f92672">import</span> EngineCoreProc
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Start local engines.</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> local_engine_count:
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># 按照DP大小启动多个EngineCore</span>
+</span></span><span style="display:flex;"><span>            local_engine_manager <span style="color:#f92672">=</span> CoreEngineProcManager(
+</span></span><span style="display:flex;"><span>               <span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>            local_engine_manager <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">yield</span> local_engine_manager, coordinator, addresses
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Now wait for engines to start.</span>
+</span></span><span style="display:flex;"><span>        wait_for_engine_startup(<span style="color:#f92672">...</span>)
+</span></span></code></pre></div><h4 id="22-enginecore-进程创建">
+    2.2 EngineCore 进程创建<a class="hash-link" href="#22-enginecore-%e8%bf%9b%e7%a8%8b%e5%88%9b%e5%bb%ba" title="Direct link to heading">#</a>
+</h4><blockquote>
+<p>CoreEngineProcManager 类负责创建和管理后台进程，每个进程对应一个 engine-core 实例：</p></blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">CoreEngineProcManager</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">def</span> __init__(<span style="color:#f92672">...</span>):
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> index <span style="color:#f92672">in</span> range(local_engine_count):
+</span></span><span style="display:flex;"><span>            local_index <span style="color:#f92672">=</span> local_start_index <span style="color:#f92672">+</span> index
+</span></span><span style="display:flex;"><span>            global_index <span style="color:#f92672">=</span> start_index <span style="color:#f92672">+</span> index
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># Start EngineCore in background process.</span>
+</span></span><span style="display:flex;"><span>            local_dp_ranks<span style="color:#f92672">.</span>append(local_index)
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>processes<span style="color:#f92672">.</span>append(
+</span></span><span style="display:flex;"><span>                context<span style="color:#f92672">.</span>Process(
+</span></span><span style="display:flex;"><span>                    target<span style="color:#f92672">=</span>target_fn,  
+</span></span><span style="display:flex;"><span>                    name<span style="color:#f92672">=</span><span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;EngineCore_DP</span><span style="color:#e6db74">{</span>global_index<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>,
+</span></span><span style="display:flex;"><span>                    kwargs<span style="color:#f92672">=</span>common_kwargs
+</span></span><span style="display:flex;"><span>                    <span style="color:#f92672">|</span> {
+</span></span><span style="display:flex;"><span>                        <span style="color:#e6db74">&#34;dp_rank&#34;</span>: global_index,
+</span></span><span style="display:flex;"><span>                        <span style="color:#e6db74">&#34;local_dp_rank&#34;</span>: local_index,
+</span></span><span style="display:flex;"><span>                    },
+</span></span><span style="display:flex;"><span>                )
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>    proc<span style="color:#f92672">.</span>start()
+</span></span></code></pre></div><ul>
+<li><code>sglang</code>: 通过 <code>launch_dp_schedulers</code> 为每个<code>dp_rank</code> 创建一个线程。</li>
+</ul>
+<h4 id="23-enginecore-实例创建">
+    2.3 EngineCore 实例创建<a class="hash-link" href="#23-enginecore-%e5%ae%9e%e4%be%8b%e5%88%9b%e5%bb%ba" title="Direct link to heading">#</a>
+</h4><blockquote>
+<p><code>run_engine_core</code>作为 <code>target_fn</code>传递给EngineCore进程，每个 engine-core 进程都会初始化一个 EngineCore 实例，处理分配给自己的数据并行任务</p></blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">run_engine_core</span>(<span style="color:#f92672">*</span>args, dp_rank: int <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>, local_dp_rank: int <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>, <span style="color:#f92672">**</span>kwargs):
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;&#34;&#34;Launch EngineCore busy loop in background process.&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>    engine_core: EngineCoreProc <span style="color:#f92672">|</span> <span style="color:#66d9ef">None</span> <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">try</span>:
+</span></span><span style="display:flex;"><span>        parallel_config: ParallelConfig <span style="color:#f92672">=</span> kwargs[<span style="color:#e6db74">&#34;vllm_config&#34;</span>]<span style="color:#f92672">.</span>parallel_config
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> parallel_config<span style="color:#f92672">.</span>data_parallel_size <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">1</span> <span style="color:#f92672">or</span> dp_rank <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>:
+</span></span><span style="display:flex;"><span>            set_process_title(<span style="color:#e6db74">&#34;EngineCore&#34;</span>, <span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;DP</span><span style="color:#e6db74">{</span>dp_rank<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>)
+</span></span><span style="display:flex;"><span>            decorate_logs()
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># Set data parallel rank for this engine process.</span>
+</span></span><span style="display:flex;"><span>            parallel_config<span style="color:#f92672">.</span>data_parallel_rank <span style="color:#f92672">=</span> dp_rank
+</span></span><span style="display:flex;"><span>            parallel_config<span style="color:#f92672">.</span>data_parallel_rank_local <span style="color:#f92672">=</span> local_dp_rank
+</span></span><span style="display:flex;"><span>            engine_core <span style="color:#f92672">=</span> DPEngineCoreProc(<span style="color:#f92672">*</span>args, <span style="color:#f92672">**</span>kwargs)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>            set_process_title(<span style="color:#e6db74">&#34;EngineCore&#34;</span>)
+</span></span><span style="display:flex;"><span>            decorate_logs()
+</span></span><span style="display:flex;"><span>            engine_core <span style="color:#f92672">=</span> EngineCoreProc(<span style="color:#f92672">*</span>args, <span style="color:#f92672">**</span>kwargs)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        engine_core<span style="color:#f92672">.</span>run_busy_loop()
+</span></span></code></pre></div><h4 id="24-dplbasyncmpclient-实例初始化">
+    2.4 DPLBAsyncMPClient 实例初始化<a class="hash-link" href="#24-dplbasyncmpclient-%e5%ae%9e%e4%be%8b%e5%88%9d%e5%a7%8b%e5%8c%96" title="Direct link to heading">#</a>
+</h4><blockquote>
+<p>根据并行配置初始化Client， 用于接受请求并做DP负载均衡</p></blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>   <span style="color:#a6e22e">@staticmethod</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">make_async_mp_client</span>(
+</span></span><span style="display:flex;"><span>        vllm_config: VllmConfig,
+</span></span><span style="display:flex;"><span>        executor_class: type[Executor],
+</span></span><span style="display:flex;"><span>        log_stats: bool,
+</span></span><span style="display:flex;"><span>        client_addresses: dict[str, str] <span style="color:#f92672">|</span> <span style="color:#66d9ef">None</span> <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>        client_count: int <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>,
+</span></span><span style="display:flex;"><span>        client_index: int <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>,
+</span></span><span style="display:flex;"><span>    ) <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;MPClient&#34;</span>:
+</span></span><span style="display:flex;"><span>        parallel_config <span style="color:#f92672">=</span> vllm_config<span style="color:#f92672">.</span>parallel_config
+</span></span><span style="display:flex;"><span>        client_args <span style="color:#f92672">=</span> (<span style="color:#f92672">...</span>)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> parallel_config<span style="color:#f92672">.</span>data_parallel_size <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">1</span>:
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> parallel_config<span style="color:#f92672">.</span>data_parallel_external_lb:
+</span></span><span style="display:flex;"><span>                <span style="color:#75715e"># External load balancer - client per DP rank.</span>
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">return</span> DPAsyncMPClient(<span style="color:#f92672">*</span>client_args)
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># Internal load balancer - client balances to all DP ranks.</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">return</span> DPLBAsyncMPClient(<span style="color:#f92672">*</span>client_args)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> AsyncMPClient(<span style="color:#f92672">*</span>client_args)
+</span></span></code></pre></div><h3 id="3-请求处理流程">
+    3. 请求处理流程<a class="hash-link" href="#3-%e8%af%b7%e6%b1%82%e5%a4%84%e7%90%86%e6%b5%81%e7%a8%8b" title="Direct link to heading">#</a>
+</h3><h4 id="31-添加请求">
+    3.1 添加请求<a class="hash-link" href="#31-%e6%b7%bb%e5%8a%a0%e8%af%b7%e6%b1%82" title="Direct link to heading">#</a>
+</h4><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DPAsyncMPClient</span>(AsyncMPClient):
+</span></span><span style="display:flex;"><span>  	<span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">async</span> <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">add_request_async</span>(self, request: EngineCoreRequest) <span style="color:#f92672">-&gt;</span> <span style="color:#66d9ef">None</span>:
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>_ensure_stats_update_task()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        request<span style="color:#f92672">.</span>current_wave <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>current_wave
+</span></span><span style="display:flex;"><span>        request<span style="color:#f92672">.</span>client_index <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>client_index
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e"># 执行负载均衡选择特定engine</span>
+</span></span><span style="display:flex;"><span>        chosen_engine <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>get_core_engine_for_request(request)
+</span></span><span style="display:flex;"><span>        to_await <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>_send_input(EngineCoreRequestType<span style="color:#f92672">.</span>ADD, request, chosen_engine)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#f92672">not</span> self<span style="color:#f92672">.</span>engines_running:
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># Notify coordinator that we&#39;re sending a request</span>
+</span></span><span style="display:flex;"><span>            req_msg <span style="color:#f92672">=</span> msgspec<span style="color:#f92672">.</span>msgpack<span style="color:#f92672">.</span>encode((<span style="color:#e6db74">&#34;FIRST_REQ&#34;</span>, chosen_engine))
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">await</span> self<span style="color:#f92672">.</span>first_req_send_socket<span style="color:#f92672">.</span>send(req_msg)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">await</span> to_await
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>_ensure_output_queue_task()
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">...</span>
+</span></span></code></pre></div><h4 id="32-通过负载均衡选择engine">
+    3.2 通过负载均衡选择Engine<a class="hash-link" href="#32-%e9%80%9a%e8%bf%87%e8%b4%9f%e8%bd%bd%e5%9d%87%e8%a1%a1%e9%80%89%e6%8b%a9engine" title="Direct link to heading">#</a>
+</h4><blockquote>
+<p>vllm内部实现了一种基于请求计数的负载均衡算法，通过计算每个引擎的负载分数来选择最佳引擎。</p></blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DPLBAsyncMPClient</span>(DPAsyncMPClient):
+</span></span><span style="display:flex;"><span>  	<span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_core_engine_for_request</span>(self, request: EngineCoreRequest) <span style="color:#f92672">-&gt;</span> EngineIdentity:
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Engines are in rank order.</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> (eng_index <span style="color:#f92672">:=</span> request<span style="color:#f92672">.</span>data_parallel_rank) <span style="color:#f92672">is</span> <span style="color:#66d9ef">None</span>:
+</span></span><span style="display:flex;"><span>            current_counts <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>lb_engines
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># TODO use P2C alg for larger DP sizes</span>
+</span></span><span style="display:flex;"><span>            num_engines <span style="color:#f92672">=</span> len(current_counts)
+</span></span><span style="display:flex;"><span>            min_score <span style="color:#f92672">=</span> sys<span style="color:#f92672">.</span>maxsize
+</span></span><span style="display:flex;"><span>            eng_index <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(num_engines):
+</span></span><span style="display:flex;"><span>                idx <span style="color:#f92672">=</span> (self<span style="color:#f92672">.</span>eng_start_index <span style="color:#f92672">+</span> i) <span style="color:#f92672">%</span> num_engines
+</span></span><span style="display:flex;"><span>                <span style="color:#75715e"># 实现了一种基于请求计数的负载均衡算法</span>
+</span></span><span style="display:flex;"><span>                waiting, running <span style="color:#f92672">=</span> current_counts[idx]
+</span></span><span style="display:flex;"><span>                score <span style="color:#f92672">=</span> waiting <span style="color:#f92672">*</span> <span style="color:#ae81ff">4</span> <span style="color:#f92672">+</span> running
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">if</span> score <span style="color:#f92672">&lt;</span> min_score:
+</span></span><span style="display:flex;"><span>                    min_score <span style="color:#f92672">=</span> score
+</span></span><span style="display:flex;"><span>                    eng_index <span style="color:#f92672">=</span> idx
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># Increment local waiting count for better balancing between stats</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># updates from the coordinator (which happen every 100ms).</span>
+</span></span><span style="display:flex;"><span>            current_counts[eng_index][<span style="color:#ae81ff">0</span>] <span style="color:#f92672">+=</span> self<span style="color:#f92672">.</span>client_count
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        chosen_engine <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>core_engines[eng_index]
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Record which engine is chosen for this request, to handle aborts.</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>reqs_in_flight[request<span style="color:#f92672">.</span>request_id] <span style="color:#f92672">=</span> chosen_engine
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> chosen_engine
+</span></span></code></pre></div><ul>
+<li><code>sglang</code>: 有一个<code>--load-balance-method</code> 参数支持三种负载均衡策略：
+<ul>
+<li><code>ROUND_ROBIN</code> ：轮询分发请求(默认)</li>
+<li><code>SHORTEST_QUEUE</code> ：选择队列最短的worker</li>
+<li><code>MINIMUM_TOKENS</code> ：选择当前处理令牌最少的worker（已弃用）`</li>
+</ul>
+</li>
+</ul>
+<h3 id="4-dp全局请求状态同步">
+    4. DP全局请求状态同步<a class="hash-link" href="#4-dp%e5%85%a8%e5%b1%80%e8%af%b7%e6%b1%82%e7%8a%b6%e6%80%81%e5%90%8c%e6%ad%a5" title="Direct link to heading">#</a>
+</h3><p>选择好对应的DP后，后续的执行逻辑中，DP间需要通信来完成状态同步，以确保所有DP进程都能了解全局是否还有未完成的请求。主要是为了保证系统的一致性、同步性和高效资源利用(<strong>保持所有DP进程的执行节奏同步, 避免出现部分DP进程资源不均衡</strong>)。</p>
+<ul>
+<li>在 DPEngineCoreProc 的 run_busy_loop 方法中，会定期（每32次调度）调用 <code>_has_global_unfinished_reqs</code> 方法。</li>
+<li>该方法通过 <code>ParallelConfig.has_unfinished_dp</code> 静态方法执行 <code>torch.distributed.all_reduce</code> 操作，采用 ReduceOp.MAX （相当于逻辑OR）来聚合所有DP进程的本地未完成请求状态。</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_has_global_unfinished_reqs</span>(self, local_unfinished: bool) <span style="color:#f92672">-&gt;</span> bool:
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Optimization - only perform finish-sync all-reduce every 32 steps.</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>step_counter <span style="color:#f92672">+=</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>step_counter <span style="color:#f92672">%</span> <span style="color:#ae81ff">32</span> <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>:
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">return</span> <span style="color:#66d9ef">True</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> ParallelConfig<span style="color:#f92672">.</span>has_unfinished_dp(self<span style="color:#f92672">.</span>dp_group, local_unfinished)
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">@staticmethod</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">has_unfinished_dp</span>(dp_group: ProcessGroup, has_unfinished: bool) <span style="color:#f92672">-&gt;</span> bool:
+</span></span><span style="display:flex;"><span>        tensor <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>tensor([has_unfinished], dtype<span style="color:#f92672">=</span>torch<span style="color:#f92672">.</span>int32, device<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;cpu&#34;</span>)
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># dp rank 0: has_unfinished_seqs=True</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># dp rank 1: has_unfinished_seqs=False</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># aggregated: has_unfinished_seqs=True</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># so this is an OR operation, i.e. MAX in integers</span>
+</span></span><span style="display:flex;"><span>        torch<span style="color:#f92672">.</span>distributed<span style="color:#f92672">.</span>all_reduce(tensor, op<span style="color:#f92672">=</span>ReduceOp<span style="color:#f92672">.</span>MAX, group<span style="color:#f92672">=</span>dp_group)
+</span></span><span style="display:flex;"><span>        aggregated_has_unfinished <span style="color:#f92672">=</span> bool(tensor<span style="color:#f92672">.</span>item())
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> aggregated_has_unfinished
+</span></span></code></pre></div><ul class="pa0">
+  
+   <li class="list di">
+     <a href="../../tags/parallel/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">Parallel</a>
+   </li>
+  
+   <li class="list di">
+     <a href="../../tags/vllm/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">Vllm</a>
+   </li>
+  
+   <li class="list di">
+     <a href="../../tags/inference/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">Inference</a>
+   </li>
+  
+</ul>
+<div class="mt6 instapaper_ignoref">
+      
+      
+      
+      
+      
+      <script src="https://utteranc.es/client.js" repo="ZhongsJie96/ZhongsJie96.github.io" issue-term="pathname"
+        label="Comment" theme="github-light" crossorigin="anonymous" async>
+        </script>
+    </div>
+  </div>
+
+  <aside class="w-30-l mt6-l">
+
+
+
+
+  <div class="bg-light-gray pa3 nested-list-reset nested-copy-line-height nested-links">
+    <p class="f5 b mb3">Related</p>
+    <ul class="pa0 list">
+	   
+	     <li  class="mb2">
+          <a href="../../posts/2025-12-09-vllm-async-scheduling/">vllm 异步调度解析</a>
+        </li>
+	    
+    </ul>
+</div>
+
+</aside>
+
+</article>
+
+    </main>
+    <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
+      &copy;  Atomage's Blog  2022-2025 
+    </a>
+    <div>
+<div class="ananke-socials">
+  
+    
+    <a href="https://github.com/ZhongsJie" target="_blank" rel="noopener" class="github ananke-social-link link-transition stackoverflow link dib z-999 pt3 pt0-l mr1" title="GitHub link" aria-label="follow on GitHub——Opens in a new window">
+      
+        <span class="icon"><svg style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+</span>
+      
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;"/>
+</svg>
+</span></a>
+  
+</div>
+</div>
+    <a href="https://beian.miit.gov.cn/" class="link db f6 pa2 br3 bg-mid-gray white dim w4 tc"> 蜀ICP备2022025742号 </a>
+    
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
+      <script>
+        var doNotTrack = false;
+        if ( false ) {
+          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
+          var doNotTrack = (dnt == "1" || dnt == "yes");
+        }
+        if (!doNotTrack) {
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-HVT9CMYGB1');
+        }
+      </script>
+  </div>
+</footer>
+
+  </body>
+</html>

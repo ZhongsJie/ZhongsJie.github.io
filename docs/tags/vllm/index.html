@@ -45,8 +45,8 @@
 
   <meta itemprop="name" content="Vllm">
   <meta itemprop="description" content="分界">
-  <meta itemprop="datePublished" content="2025-12-09T11:51:25+08:00">
-  <meta itemprop="dateModified" content="2025-12-09T11:51:25+08:00">
+  <meta itemprop="datePublished" content="2025-12-28T21:15:37+08:00">
+  <meta itemprop="dateModified" content="2025-12-28T21:15:37+08:00">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Vllm">
   <meta name="twitter:description" content="分界">
@@ -134,6 +134,35 @@
   </article>
   <div class="mw8 center">
     <section class="flex-ns flex-wrap justify-around mt5">
+      
+        <div class="relative w-100  mb4 bg-white">
+          <div class="relative w-100 mb4 bg-white nested-copy-line-height">
+  <div class="bg-white mb3 pa4 gray overflow-hidden">
+    <span class="f6 db">📎Posts</span>
+    <h1 class="f3 near-black">
+      <a href="../../posts/2025-12-28-data-parallel/" class="link black dim">
+        vllm DP (Data Parallel)
+      </a>
+    </h1>
+    <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
+      <h2 id="dp基本概念">
+    DP基本概念<a class="hash-link" href="#dp%e5%9f%ba%e6%9c%ac%e6%a6%82%e5%bf%b5" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>DP在推理场景下的核心思想，在多个 GPU/节点上完整复制同一个模型权重，每个副本独立处理不同的请求或批次，从而<strong>近似线性提升吞吐</strong>。与训练中的 DP 需要梯度聚合不同，推理 DP 没有参数同步，通信负担主要来自调度、路由、指标与可选的缓存协同。</p></blockquote>
+<p>具体来说</p>
+<ul>
+<li>每个 GPU/设备都拥有模型的完整副本</li>
+<li>输入数据被分割成多个批次，通过负载均衡分配给不同设备</li>
+<li>各设备独立进行前向推理</li>
+<li>每个设备产生各自批次的输出结果</li>
+</ul>
+<p>在DP部署方式下由于单卡的计算效率基本保持不变，因此<strong>吞吐提升近似是线性</strong>：理论上2 张卡就是 2 倍吞吐，4 张卡就是 4 倍，以此类推。</p>
+<p>在大规模部署DP的时候，由于整体可支持的吞吐翻倍，API服务器需要面临成倍的压力，因此<strong>API服务器（Tokenize等预处理）可能会成为系统瓶颈</strong>。vllm可以使用<code>--api-server-count</code>命令行选项来扩展，最终暴露给用户的是一个Endpoint，在内部实现API服务器的扩展。</p>
+    </div>
+  </div>
+</div>
+
+        </div>
       
         <div class="relative w-100  mb4 bg-white">
           <div class="relative w-100 mb4 bg-white nested-copy-line-height">
