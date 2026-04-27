@@ -11,9 +11,11 @@
 
 本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。
 
+
     概述#
 
 网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理
+
 
 
 应用层 ：为特定应用程序提供数据传输服务，例如 HTTP、DNS 等协议。数据单位为报文。
@@ -31,7 +33,7 @@
 
     TCP头格式#
 ">
-    <meta name="generator" content="Hugo 0.145.0">
+    <meta name="generator" content="Hugo 0.154.5">
     
     
     
@@ -88,8 +90,6 @@
   <body class="ma0 avenir bg-near-white">
 
     
-
-
 
   <header>
     <div class="bg-black">
@@ -152,60 +152,29 @@
   </header>
 
 
-
     <main class="pb7" role="main">
       
-
-<article class="flex-l flex-wrap justify-between mw8 center ph3">
-  <header class="mt4 w-100">
-    <aside class="instapaper_ignoref b helvetica tracked">
-      
-      📎POSTS
-    </aside>
-    
-
-
-
-
-
-
-
-
-
-
-  <div id="sharing" class="mt3 ananke-socials">
-    
-  </div>
-
-
-    <h1 class="f1 athelas mt3 mb1">TCP/IP 协议的那些东西</h1>
-    
-    <p class="tracked">
-      By <strong>
-        
-        ZhongsJie
-        
-      </strong>
-    </p>
-    
-    
-    <time class="f6 mv4 dib tracked" datetime="2023-07-12T22:12:14+08:00" >July 12, 2023</time>
-
-    
-    
-    <span class="f6 mv4 dib tracked"> - 8 minutes read</span>
-    <span class="f6 mv4 dib tracked"> - 3537 words</span>
-    
-  </header>
-  <div class="nested-copy-line-height lh-copy serif f4 nested-links
-    nested-img mid-gray pr4-l w-100-l"><h2 id="tcpip-协议的那些东西">
+<div class="flex-l mt2 mw8 center">
+  <article class="center cf pv5 ph3 ph4-ns mw7">
+    <header>
+      <p class="f6 b helvetica tracked">
+        POSTS
+      </p>
+      <h1 class="f1">
+        TCP/IP 协议的那些东西
+      </h1>
+    </header>
+    <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray">
+      <h2 id="tcpip-协议的那些东西">
     TCP/IP 协议的那些东西<a class="hash-link" href="#tcpip-%e5%8d%8f%e8%ae%ae%e7%9a%84%e9%82%a3%e4%ba%9b%e4%b8%9c%e8%a5%bf" title="Direct link to heading">#</a>
 </h2><blockquote>
-<p>本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。</p></blockquote>
+<p>本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。</p>
+</blockquote>
 <h3 id="概述">
     概述<a class="hash-link" href="#%e6%a6%82%e8%bf%b0" title="Direct link to heading">#</a>
 </h3><blockquote>
-<p>网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理</p></blockquote>
+<p>网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理</p>
+</blockquote>
 <p><img src="../../images/2023-07/image-OSI-model.png" alt="OSI Model"></p>
 <ul>
 <li><strong>应用层</strong> ：为特定应用程序提供数据传输服务，例如 HTTP、DNS 等协议。数据单位为报文。</li>
@@ -248,7 +217,8 @@
 <h3 id="tcp的连接和终止">
     TCP的连接和终止<a class="hash-link" href="#tcp%e7%9a%84%e8%bf%9e%e6%8e%a5%e5%92%8c%e7%bb%88%e6%ad%a2" title="Direct link to heading">#</a>
 </h3><blockquote>
-<p>TCP为应用层提供全双工服务, 这意味数据能在两个方向上独立地进行传输</p></blockquote>
+<p>TCP为应用层提供全双工服务, 这意味数据能在两个方向上独立地进行传输</p>
+</blockquote>
 <p><img src="../../images/2023-07/image-tcp-open-close.jpg" alt="三次握手&amp;四次挥手"></p>
 <ol>
 <li>
@@ -348,7 +318,8 @@
 <h3 id="tcp流量控制">
     TCP流量控制<a class="hash-link" href="#tcp%e6%b5%81%e9%87%8f%e6%8e%a7%e5%88%b6" title="Direct link to heading">#</a>
 </h3><blockquote>
-<p>TCP头里有一个字段叫Window，又叫Advertised-Window，这个字段是接收端告诉发送端自己还有多少缓冲区可以接收数据。于是发送端就可以根据这个接收端的处理能力来发送数据，而不会导致接收端处理不过来</p></blockquote>
+<p>TCP头里有一个字段叫Window，又叫Advertised-Window，这个字段是接收端告诉发送端自己还有多少缓冲区可以接收数据。于是发送端就可以根据这个接收端的处理能力来发送数据，而不会导致接收端处理不过来</p>
+</blockquote>
 <p><img src="../../images/2023-07/image-tcp-cache.png" alt="tcp-cache"></p>
 <ol>
 <li>利用滑动窗口实现流量控制，就是让发送方的发送速率不要太快，要让接收方来得及接收。</li>
@@ -359,7 +330,8 @@
 <h3 id="tcp拥塞控制">
     TCP拥塞控制<a class="hash-link" href="#tcp%e6%8b%a5%e5%a1%9e%e6%8e%a7%e5%88%b6" title="Direct link to heading">#</a>
 </h3><blockquote>
-<p>所谓拥塞控制就是防止过多的数据注入到网络中，这样可以使网络中的路由器或链路不致过载, 当拥塞发生的时候，要做自我牺牲</p></blockquote>
+<p>所谓拥塞控制就是防止过多的数据注入到网络中，这样可以使网络中的路由器或链路不致过载, 当拥塞发生的时候，要做自我牺牲</p>
+</blockquote>
 <p>拥塞控制主要是四个算法：1）慢开始，2）拥塞避免，3）拥塞发生，4）快恢复</p>
 <ol>
 <li>发送方维护一个拥塞窗口cwnd的变量，值取决于网络的拥塞程度，并且值是动态的
@@ -406,39 +378,16 @@
 <ol>
 <li>发送方将慢开始门限ssthread和cwnd窗口都设置为当前的一半，并且开始执行拥塞避免算法</li>
 </ol>
-<ul class="pa0">
-  
-   <li class="list di">
-     <a href="../../tags/tcp/ip/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">TCP/IP</a>
-   </li>
-  
-</ul>
-<div class="mt6 instapaper_ignoref">
-      
-      
-      
-      
-      
-      <script src="https://utteranc.es/client.js" repo="ZhongsJie96/ZhongsJie96.github.io" issue-term="pathname"
-        label="Comment" theme="github-light" crossorigin="anonymous" async>
-        </script>
+
     </div>
-  </div>
-
-  <aside class="w-30-l mt6-l">
-
-
-
-
-</aside>
-
-</article>
+  </article>
+</div>
 
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
     <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
-      &copy;  Atomage's Blog  2022-2025 
+      &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>
 <div class="ananke-socials">
@@ -463,7 +412,7 @@
       <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
       <script>
         var doNotTrack = false;
-        if ( false ) {
+        if ( true ) {
           var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
           var doNotTrack = (dnt == "1" || dnt == "yes");
         }

@@ -7,7 +7,7 @@
     <title>Atomage&#39;s Blog</title>
     <meta name="viewport" content="width=device-width,minimum-scale=1">
     <meta name="description" content="分界">
-    <meta name="generator" content="Hugo 0.145.0">
+    <meta name="generator" content="Hugo 0.154.5">
     
     
     
@@ -148,11 +148,13 @@
       <h2 id="tcpip-协议的那些东西">
     TCP/IP 协议的那些东西<a class="hash-link" href="#tcpip-%e5%8d%8f%e8%ae%ae%e7%9a%84%e9%82%a3%e4%ba%9b%e4%b8%9c%e8%a5%bf" title="Direct link to heading">#</a>
 </h2><blockquote>
-<p>本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。</p></blockquote>
+<p>本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。</p>
+</blockquote>
 <h3 id="概述">
     概述<a class="hash-link" href="#%e6%a6%82%e8%bf%b0" title="Direct link to heading">#</a>
 </h3><blockquote>
-<p>网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理</p></blockquote>
+<p>网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理</p>
+</blockquote>
 <p><img src="../../../images/2023-07/image-OSI-model.png" alt="OSI Model"></p>
 <ul>
 <li><strong>应用层</strong> ：为特定应用程序提供数据传输服务，例如 HTTP、DNS 等协议。数据单位为报文。</li>
@@ -183,7 +185,7 @@
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
     <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
-      &copy;  Atomage's Blog  2022-2025 
+      &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>
 <div class="ananke-socials">
@@ -208,7 +210,7 @@
       <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
       <script>
         var doNotTrack = false;
-        if ( false ) {
+        if ( true ) {
           var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
           var doNotTrack = (dnt == "1" || dnt == "yes");
         }

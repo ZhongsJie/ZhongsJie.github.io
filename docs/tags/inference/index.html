@@ -7,7 +7,7 @@
     <title>Atomage&#39;s Blog</title>
     <meta name="viewport" content="width=device-width,minimum-scale=1">
     <meta name="description" content="分界">
-    <meta name="generator" content="Hugo 0.145.0">
+    <meta name="generator" content="Hugo 0.154.5">
     
     
     
@@ -45,8 +45,8 @@
 
   <meta itemprop="name" content="Inference">
   <meta itemprop="description" content="分界">
-  <meta itemprop="datePublished" content="2025-12-28T21:15:37+08:00">
-  <meta itemprop="dateModified" content="2025-12-28T21:15:37+08:00">
+  <meta itemprop="datePublished" content="2026-04-27T21:37:50+08:00">
+  <meta itemprop="dateModified" content="2026-04-27T21:37:50+08:00">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Inference">
   <meta name="twitter:description" content="分界">
@@ -140,6 +140,106 @@
   <div class="bg-white mb3 pa4 gray overflow-hidden">
     <span class="f6 db">📎Posts</span>
     <h1 class="f3 near-black">
+      <a href="../../posts/2026-04-27-torchinductor-pattern-matcher/" class="link black dim">
+        TorchInductor Pattern Matcher
+      </a>
+    </h1>
+    <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
+      <h2 id="pytorch-fx-图">
+    PyTorch FX 图<a class="hash-link" href="#pytorch-fx-%e5%9b%be" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>PyTorch FX 是用于捕获、分析和转换 PyTorch 计算图。FX 图是一种静态表示，它记录了 PyTorch 代码的执行流程。用户通过将模型表示为FX图，可以更轻松地进行各种转换，例如图优化，量化，算子融合等。</p>
+</blockquote>
+<p>FX 图的核心组件包括：</p>
+<ul>
+<li><code>torch.fx.Graph</code>：计算图的容器</li>
+<li><code>torch.fx.Node</code>：图中的节点，表示计算操作，如函数调用、方法调用等</li>
+<li><code>torch.fx.GraphModule</code>：由图构建的可执行模块</li>
+</ul>
+<pre tabindex="0"><code class="language-mermaid" data-lang="mermaid">graph TD
+    subgraph FX_Graph
+        A[&#34;Placeholder Node&#34;] --&gt; B[&#34;CallFunction Node&#34;]
+        B --&gt; C[&#34;CallMethod Node&#34;]
+        C --&gt; D[&#34;Output Node&#34;]
+        E[&#34;Module Node&#34;] --&gt; B
+    end
+    subgraph Components
+        F[&#34;torch.fx.Graph&#34;] --&gt; FX_Graph
+        G[&#34;torch.fx.Node&#34;] --&gt; A
+        G --&gt; B
+        G --&gt; C
+        G --&gt; D
+        H[&#34;torch.fx.GraphModule&#34;] --&gt; F
+    end
+    style FX_Graph stroke:#333,stroke-width:2px
+    style Components stroke:#333,stroke-width:2px
+</code></pre><h3 id="fx-symbolic-tracing">
+    FX Symbolic Tracing<a class="hash-link" href="#fx-symbolic-tracing" title="Direct link to heading">#</a>
+</h3><p>FX 图的生成过程称为&quot;符号追踪&quot;（Symbolic Tracing），主要步骤包括：</p>
+<ol>
+<li><strong>追踪</strong>：使用 <code>torch.fx.symbolic_trace()</code> 对 PyTorch 函数或模块进行追踪</li>
+<li><strong>捕获</strong>：捕获函数执行过程中的所有操作，构建计算图</li>
+<li><strong>表示</strong>：将计算图表示为 <code>Graph</code> 对象，其中包含一系列 <code>Node</code> 对象</li>
+<li><strong>转换</strong>：对捕获的图进行分析和转换</li>
+<li><strong>执行</strong>：将转换后的图包装为 <code>GraphModule</code>，可像普通 PyTorch 模块一样执行</li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">import</span> torch
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Simple module for demonstration</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MyModule</span>(torch<span style="color:#f92672">.</span>nn<span style="color:#f92672">.</span>Module):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">__init__</span>(self) <span style="color:#f92672">-&gt;</span> <span style="color:#66d9ef">None</span>:
+</span></span><span style="display:flex;"><span>        super()<span style="color:#f92672">.</span><span style="color:#a6e22e">__init__</span>()
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>param <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>nn<span style="color:#f92672">.</span>Parameter(torch<span style="color:#f92672">.</span>rand(<span style="color:#ae81ff">3</span>, <span style="color:#ae81ff">4</span>))
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>linear <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>nn<span style="color:#f92672">.</span>Linear(<span style="color:#ae81ff">4</span>, <span style="color:#ae81ff">5</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward</span>(self, x):
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> self<span style="color:#f92672">.</span>linear(x <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>param)<span style="color:#f92672">.</span>clamp(min<span style="color:#f92672">=</span><span style="color:#ae81ff">0.0</span>, max<span style="color:#f92672">=</span><span style="color:#ae81ff">1.0</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>module <span style="color:#f92672">=</span> MyModule()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">from</span> torch.fx <span style="color:#f92672">import</span> symbolic_trace
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Symbolic tracing frontend - captures the semantics of the module</span>
+</span></span><span style="display:flex;"><span>symbolic_traced: torch<span style="color:#f92672">.</span>fx<span style="color:#f92672">.</span>GraphModule <span style="color:#f92672">=</span> symbolic_trace(module)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># High-level intermediate representation (IR) - Graph representation</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 由一个列表组成 代表函数输入、调用点（函数、方法、 或 torch.nn.Module 实例），以及返回值。</span>
+</span></span><span style="display:flex;"><span>print(symbolic_traced<span style="color:#f92672">.</span>graph)
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">graph():
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    </span><span style="color:#e6db74">%x</span><span style="color:#e6db74"> : [num_users=1] = placeholder[target=x]
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    %param : [num_users=1] = get_attr[target=param]
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    </span><span style="color:#e6db74">%a</span><span style="color:#e6db74">dd : [num_users=1] = call_function[target=operator.add](args = (</span><span style="color:#e6db74">%x</span><span style="color:#e6db74">, %param), kwargs = </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">)
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    </span><span style="color:#e6db74">%li</span><span style="color:#e6db74">near : [num_users=1] = call_module[target=linear](args = (</span><span style="color:#e6db74">%a</span><span style="color:#e6db74">dd,), kwargs = </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">)
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    </span><span style="color:#e6db74">%c</span><span style="color:#e6db74">lamp : [num_users=1] = call_method[target=clamp](args = (</span><span style="color:#e6db74">%li</span><span style="color:#e6db74">near,), kwargs = {min: 0.0, max: 1.0})
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    return clamp
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Code generation - valid Python code</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 使 FX 成为 Python 到 Python（或 模块到模块）转换工具包。对于每个 Graph IR，我们可以 创建与图语义匹配的有效 Python 代码。</span>
+</span></span><span style="display:flex;"><span>print(symbolic_traced<span style="color:#f92672">.</span>code)
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">def forward(self, x):
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    param = self.param
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    add = x + param;  x = param = None
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    linear = self.linear(add);  add = None
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    clamp = linear.clamp(min = 0.0, max = 1.0);  linear = None
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    return clamp
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span></code></pre></div><p>FX 图的特点</p>
+    </div>
+  </div>
+</div>
+
+        </div>
+      
+        <div class="relative w-100  mb4 bg-white">
+          <div class="relative w-100 mb4 bg-white nested-copy-line-height">
+  <div class="bg-white mb3 pa4 gray overflow-hidden">
+    <span class="f6 db">📎Posts</span>
+    <h1 class="f3 near-black">
       <a href="../../posts/2025-12-28-data-parallel/" class="link black dim">
         vllm DP (Data Parallel)
       </a>
@@ -148,7 +248,8 @@
       <h2 id="dp基本概念">
     DP基本概念<a class="hash-link" href="#dp%e5%9f%ba%e6%9c%ac%e6%a6%82%e5%bf%b5" title="Direct link to heading">#</a>
 </h2><blockquote>
-<p>DP在推理场景下的核心思想，在多个 GPU/节点上完整复制同一个模型权重，每个副本独立处理不同的请求或批次，从而<strong>近似线性提升吞吐</strong>。与训练中的 DP 需要梯度聚合不同，推理 DP 没有参数同步，通信负担主要来自调度、路由、指标与可选的缓存协同。</p></blockquote>
+<p>DP在推理场景下的核心思想，在多个 GPU/节点上完整复制同一个模型权重，每个副本独立处理不同的请求或批次，从而<strong>近似线性提升吞吐</strong>。与训练中的 DP 需要梯度聚合不同，推理 DP 没有参数同步，通信负担主要来自调度、路由、指标与可选的缓存协同。</p>
+</blockquote>
 <p>具体来说</p>
 <ul>
 <li>每个 GPU/设备都拥有模型的完整副本</li>
@@ -227,7 +328,7 @@
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
     <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
-      &copy;  Atomage's Blog  2022-2025 
+      &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>
 <div class="ananke-socials">
@@ -252,7 +353,7 @@
       <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
       <script>
         var doNotTrack = false;
-        if ( false ) {
+        if ( true ) {
           var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
           var doNotTrack = (dnt == "1" || dnt == "yes");
         }

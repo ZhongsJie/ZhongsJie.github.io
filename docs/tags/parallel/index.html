@@ -7,7 +7,7 @@
     <title>Atomage&#39;s Blog</title>
     <meta name="viewport" content="width=device-width,minimum-scale=1">
     <meta name="description" content="分界">
-    <meta name="generator" content="Hugo 0.145.0">
+    <meta name="generator" content="Hugo 0.154.5">
     
     
     
@@ -148,7 +148,8 @@
       <h2 id="dp基本概念">
     DP基本概念<a class="hash-link" href="#dp%e5%9f%ba%e6%9c%ac%e6%a6%82%e5%bf%b5" title="Direct link to heading">#</a>
 </h2><blockquote>
-<p>DP在推理场景下的核心思想，在多个 GPU/节点上完整复制同一个模型权重，每个副本独立处理不同的请求或批次，从而<strong>近似线性提升吞吐</strong>。与训练中的 DP 需要梯度聚合不同，推理 DP 没有参数同步，通信负担主要来自调度、路由、指标与可选的缓存协同。</p></blockquote>
+<p>DP在推理场景下的核心思想，在多个 GPU/节点上完整复制同一个模型权重，每个副本独立处理不同的请求或批次，从而<strong>近似线性提升吞吐</strong>。与训练中的 DP 需要梯度聚合不同，推理 DP 没有参数同步，通信负担主要来自调度、路由、指标与可选的缓存协同。</p>
+</blockquote>
 <p>具体来说</p>
 <ul>
 <li>每个 GPU/设备都拥有模型的完整副本</li>
@@ -171,7 +172,7 @@
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
     <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
-      &copy;  Atomage's Blog  2022-2025 
+      &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>
 <div class="ananke-socials">
@@ -196,7 +197,7 @@
       <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
       <script>
         var doNotTrack = false;
-        if ( false ) {
+        if ( true ) {
           var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
           var doNotTrack = (dnt == "1" || dnt == "yes");
         }
