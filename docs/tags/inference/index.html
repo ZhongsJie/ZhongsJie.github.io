@@ -45,8 +45,8 @@
 
   <meta itemprop="name" content="Inference">
   <meta itemprop="description" content="分界">
-  <meta itemprop="datePublished" content="2026-04-27T21:37:50+08:00">
-  <meta itemprop="dateModified" content="2026-04-27T21:37:50+08:00">
+  <meta itemprop="datePublished" content="2026-04-28T11:03:49+08:00">
+  <meta itemprop="dateModified" content="2026-04-28T11:03:49+08:00">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Inference">
   <meta name="twitter:description" content="分界">
@@ -134,6 +134,121 @@
   </article>
   <div class="mw8 center">
     <section class="flex-ns flex-wrap justify-around mt5">
+      
+        <div class="relative w-100  mb4 bg-white">
+          <div class="relative w-100 mb4 bg-white nested-copy-line-height">
+  <div class="bg-white mb3 pa4 gray overflow-hidden">
+    <span class="f6 db">📎Posts</span>
+    <h1 class="f3 near-black">
+      <a href="../../posts/2026-04-28-vllm-distributed-communication/" class="link black dim">
+        vLLM 分布式通信
+      </a>
+    </h1>
+    <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
+      <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">WorkerProc</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;&#34;&#34;Wrapper that runs one Worker in a separate process.&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    READY_STR <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;READY&#34;</span>
+</span></span><span style="display:flex;"><span>    rpc_broadcast_mq: MessageQueue <span style="color:#f92672">|</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span>    worker_response_mq: MessageQueue <span style="color:#f92672">|</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">@instrument</span>(span_name<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;Worker init&#34;</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">__init__</span>(<span style="color:#f92672">...</span>):
+</span></span><span style="display:flex;"><span>	    self<span style="color:#f92672">.</span>rank <span style="color:#f92672">=</span> rank
+</span></span><span style="display:flex;"><span>        wrapper <span style="color:#f92672">=</span> WorkerWrapperBase(rpc_rank<span style="color:#f92672">=</span>local_rank, global_rank<span style="color:#f92672">=</span>rank)
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>        wrapper<span style="color:#f92672">.</span>init_worker(all_kwargs)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>worker <span style="color:#f92672">=</span> wrapper
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>worker<span style="color:#f92672">.</span>init_device()
+</span></span><span style="display:flex;"><span>	    <span style="color:#66d9ef">if</span> envs<span style="color:#f92672">.</span>VLLM_ELASTIC_EP_SCALE_UP_LAUNCH:
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>worker<span style="color:#f92672">.</span>elastic_ep_execute(<span style="color:#e6db74">&#34;load_model&#34;</span>)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>worker<span style="color:#f92672">.</span>load_model()
+</span></span><span style="display:flex;"><span>        <span style="color:#960050;background-color:#1e0010">。。</span>
+</span></span></code></pre></div><h2 id="worker-init_device">
+    Worker <code>init_device</code><a class="hash-link" href="#worker-init_device" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>worker的init_device函数负责初始化设备的相关信息</p>
+</blockquote>
+<ol>
+<li><strong>根据当前worker的rank找到它所属的device</strong>，将它绑到指定的卡上，以及清空该device的显存，获取该device的显存大小等</li>
+<li>对当前的worker做分布式环境初始化，也就是初始化当前worker的各种<strong>进程组</strong>（如模型并行、流水线并行、数据并行等）</li>
+<li>构造当前worker的GPUModelRunner对象。维护着模型权重分片，还维护模型运行过程中所需要的一些数据结构，比如<strong>kv cache</strong>等，<strong>负责模型权重的加载(load_model)，以及实际的推理执行过程等逻辑。</strong></li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#a6e22e">@instrument</span>(span_name<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;Init device&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">init_device</span>(self):
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>device_config<span style="color:#f92672">.</span>device_type <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;cuda&#34;</span>:
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e"># Ray 会设置 NCCL_ASYNC_ERROR_HANDLING，但这个环境变量会导致 CUDA graph</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e"># 构建时出现异常。CUDA graph 需要同步执行，而该变量会引入异步错误处理，</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e"># 两者可能引起冲突。</span>
+</span></span><span style="display:flex;"><span>		os<span style="color:#f92672">.</span>environ<span style="color:#f92672">.</span>pop(<span style="color:#e6db74">&#34;NCCL_ASYNC_ERROR_HANDLING&#34;</span>, <span style="color:#66d9ef">None</span>)
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e"># - Ray/external_launcher 场景：这些分布式执行器自己管理GPU映射</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># - 多节点场景(nnodes_within_dp &gt; 1)：每个节点有独立的GPU集合，映射逻辑不同</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># - Ray作为DP后端：Ray的resource pool处理GPU分配</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">if</span> (
+</span></span><span style="display:flex;"><span>                parallel_config<span style="color:#f92672">.</span>distributed_executor_backend
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">not</span> <span style="color:#f92672">in</span> (<span style="color:#e6db74">&#34;ray&#34;</span>, <span style="color:#e6db74">&#34;external_launcher&#34;</span>)
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">and</span> parallel_config<span style="color:#f92672">.</span>data_parallel_backend <span style="color:#f92672">!=</span> <span style="color:#e6db74">&#34;ray&#34;</span>
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">and</span> parallel_config<span style="color:#f92672">.</span>nnodes_within_dp <span style="color:#f92672">==</span> <span style="color:#ae81ff">1</span> <span style="color:#75715e"># 单节点场景</span>
+</span></span><span style="display:flex;"><span>            ):
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># local DP rank 表示在当前节点内的数据并行编号，而 global rank 可能</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># 跨节点。在单节点场景下，GPU映射只看节点内的local rank。</span>
+</span></span><span style="display:flex;"><span>            dp_local_rank <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>parallel_config<span style="color:#f92672">.</span>data_parallel_rank_local
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> dp_local_rank <span style="color:#f92672">is</span> <span style="color:#66d9ef">None</span>:
+</span></span><span style="display:flex;"><span>                dp_local_rank <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>parallel_config<span style="color:#f92672">.</span>data_parallel_index
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># DP副本 0 (dp_local_rank=0)</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># original_local_rank=0 → GPU 0 + 0×2 = GPU 0</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># original_local_rank=0 → GPU 0 + 1×2 = GPU 2 ← 偏移</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># 偏移是为了计算出实际的rank信息，后续用来初始化device</span>
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>local_rank <span style="color:#f92672">+=</span> dp_local_rank <span style="color:#f92672">*</span> tp_pp_world_size
+</span></span><span style="display:flex;"><span>            <span style="color:#960050;background-color:#1e0010">。。</span>
+</span></span><span style="display:flex;"><span>            
+</span></span><span style="display:flex;"><span>		self<span style="color:#f92672">.</span>device <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>device(<span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;cuda:</span><span style="color:#e6db74">{</span>self<span style="color:#f92672">.</span>local_rank<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>)
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e"># PyTorch的设备API演进：从 torch.cuda.set_device() 到</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># torch.accelerator.set_device_index()。 后续可以不用再手动指定，</span>
+</span></span><span style="display:flex;"><span>		torch<span style="color:#f92672">.</span>accelerator<span style="color:#f92672">.</span>set_device_index(self<span style="color:#f92672">.</span>device)
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e"># 初始化分布式推理所需的所有环境，包括通信组信息</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e"># 优先于内存快照处理逻辑，NCCL在初始化会分配内部缓存区，提前初始化用于保证显存计算的准确性</span>
+</span></span><span style="display:flex;"><span>		init_worker_distributed_environment(
+</span></span><span style="display:flex;"><span>			self<span style="color:#f92672">.</span>vllm_config,
+</span></span><span style="display:flex;"><span>			self<span style="color:#f92672">.</span>rank,
+</span></span><span style="display:flex;"><span>			self<span style="color:#f92672">.</span>distributed_init_method,
+</span></span><span style="display:flex;"><span>			self<span style="color:#f92672">.</span>local_rank,
+</span></span><span style="display:flex;"><span>			current_platform<span style="color:#f92672">.</span>dist_backend,
+</span></span><span style="display:flex;"><span>		)
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e"># 1. gc.collect() 回收Python层的垃圾对象，释放可能的GPU引用</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 2. empty_cache() 释放PyTorch缓存的显存（包括NCCL缓冲区）</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 得到一个&#34;干净&#34;的显存状态，作为基准线</span>
+</span></span><span style="display:flex;"><span>        gc<span style="color:#f92672">.</span>collect()
+</span></span><span style="display:flex;"><span>        torch<span style="color:#f92672">.</span>accelerator<span style="color:#f92672">.</span>empty_cache()
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 用于后续计算 KV cache 可用显存。</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># init_snapshot 记录当前可用显存，request_memory 根据模型配置</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 计算需要预留的 KV cache 大小。</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>init_snapshot <span style="color:#f92672">=</span> init_snapshot <span style="color:#f92672">=</span> MemorySnapshot(device<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>device)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>requested_memory <span style="color:#f92672">=</span> request_memory(init_snapshot, self<span style="color:#f92672">.</span>cache_config)
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e"># 最后初始化modelrunner，需要依赖设备、分布式通信环境，同时通过快照可以计算出可以分配的kv cache显存大小</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>use_v2_model_runner:
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>		self<span style="color:#f92672">.</span>model_runner: GPUModelRunner <span style="color:#f92672">=</span> GPUModelRunnerV2(  <span style="color:#75715e"># type: ignore</span>
+</span></span><span style="display:flex;"><span>			self<span style="color:#f92672">.</span>vllm_config, self<span style="color:#f92672">.</span>device
+</span></span><span style="display:flex;"><span>		)
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>		self<span style="color:#f92672">.</span>model_runner <span style="color:#f92672">=</span> GPUModelRunnerV1(self<span style="color:#f92672">.</span>vllm_config, self<span style="color:#f92672">.</span>device)
+</span></span><span style="display:flex;"><span>	<span style="color:#f92672">...</span>
+</span></span></code></pre></div><h2 id="init_worker_distributed_environment">
+    <code>init_worker_distributed_environment</code><a class="hash-link" href="#init_worker_distributed_environment" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>负责初始化分布式推理所需的所有环境组件</p>
+    </div>
+  </div>
+</div>
+
+        </div>
       
         <div class="relative w-100  mb4 bg-white">
           <div class="relative w-100 mb4 bg-white nested-copy-line-height">

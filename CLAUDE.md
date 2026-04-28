@@ -54,7 +54,21 @@ cover:
 
 ## Publishing
 
-The site is built to `docs/` directory for GitHub Pages deployment. Commit and push to trigger deployment.
+When ready to publish, run the following commands:
+
+```bash
+# Build for production
+hugo -e production
+
+# Add and commit changes
+git add -A
+git commit -m "Publish new blog post"
+
+# Push to remote
+git push
+```
+
+The site is built to `docs/` directory for GitHub Pages deployment. Push to trigger deployment.
 
 ## Custom Skills
 
