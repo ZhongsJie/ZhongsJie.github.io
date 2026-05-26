@@ -1,27 +1,51 @@
 {{ define "header" }}{{ partial "page-header.html" . }}{{ end }}
 {{ define "main" }}
+{{ $section := .Site.GetPage "section" .Section }}
 <div class="flex-l mt2 mw9 center">
-  <article class="flex-l flex-wrap justify-between center ph3">
-    <header class="w-100">
-      <p class="f6 b helvetica tracked">
-        {{ humanize .Section | upper }}
-      </p>
-      <h1 class="f1">
-        {{ .Title }}
-      </h1>
-    </header>
-
-    <aside class="w-20-l mt5-l pr4-l dn db-l toc-sidebar">
+  <article class="flex-l justify-between center ph3">
+    <aside class="w-20-l pr4-l dn db-l toc-sidebar">
       {{ if .TableOfContents }}
       <div class="nested-list-reset nested-copy-line-height nested-links">
-        <p class="f5 b mb2">目录</p>
+        <p class="f5 b mb2 mt0">目录</p>
         {{ .TableOfContents }}
       </div>
       {{ end }}
     </aside>
 
-    <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray w-80-l">
-      {{ .Content }}
+    <div class="w-80-l">
+      <header class="mb4">
+        <p class="f6 b helvetica tracked mt0">
+          {{ humanize .Section | upper }}
+        </p>
+        <h1 class="f1 mt2 mb2">
+          {{ .Title }}
+        </h1>
+        {{ with .Params.author }}
+        <p class="tracked mt2 mb1">
+          By <strong>
+            {{ if reflect.IsSlice . }}
+            {{ delimit . ", " | markdownify }}
+            {{else}}
+            {{ . | markdownify }}
+            {{ end }}
+          </strong>
+        </p>
+        {{ end }}
+        <time class="f6 dib tracked" {{ printf `datetime="%s" ` (.Date.Format "2006-01-02T15:04:05Z07:00" ) | safeHTMLAttr }}>
+          {{- .Date.Format "January 2, 2006" -}}
+        </time>
+        {{ if (or (eq (.Param "show_reading_time") true) (eq $section.Params.show_reading_time true) )}}
+        <span class="f6 dib tracked"> - {{ .ReadingTime}} minutes read</span>
+        <span class="f6 dib tracked"> - {{ .WordCount}} words</span>
+        {{ end }}
+        <div class="mt2">
+          {{- partial "tags.html" . -}}
+        </div>
+      </header>
+
+      <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray">
+        {{ .Content }}
+      </div>
     </div>
   </article>
 </div>
