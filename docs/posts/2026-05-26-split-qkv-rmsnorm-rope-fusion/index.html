@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    
+    <title>Split QKV &#43; RMSNorm &#43; RoPE 融合算子 | Atomage&#39;s Blog</title>
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="description" content="
+源代码: vllm-ascend/vllm_ascend/ops/triton/linearnorm/split_qkv_rmsnorm_rope.py
+
+
+    背景#
+
+    问题：内存墙#
+LLM 推理（尤其是 decode 阶段）是典型的 memory-bound 场景。每一次算子调用都是一次「从 Global Memory 搬数据到片上 → 计算 → 搬回 Global Memory」的循环。如果不融合，Split QKV → RMSNorm → RoPE 这三个步骤各自独立执行：
+非融合流程:
+  hidden_states ──[load]──&gt; Split Q,K,V ──[store]──&gt; q_in, k_in, v_in
+  q_in ──[load]──&gt; RMSNorm ──[store]──&gt; q_normed
+  k_in ──[load]──&gt; RMSNorm ──[store]──&gt; k_normed
+  q_normed ──[load]──&gt; RoPE ──[store]──&gt; q_out
+  k_normed ──[load]──&gt; RoPE ──[store]──&gt; k_out
+每一次 load/store 都是一次 GM ↔ UB 的数据搬运。数据在总线上反复进出，但实际的计算量（几个乘加 &#43; 一个开方）极小——这就是 memory-bandwidth bottleneck。">
+    <meta name="generator" content="Hugo 0.154.5">
+    
+    
+    
+    
+      <meta name="robots" content="noindex, nofollow">
+    
+
+    
+<link rel="stylesheet" href="../../ananke/css/main.min.css" >
+
+
+
+    
+
+    
+    
+      
+<link rel="shortcut icon" href="../../images/logo.svg" type="image/x-icon" />
+
+
+    
+
+    
+    
+    <meta property="og:url" content="http://localhost:1313/posts/2026-05-26-split-qkv-rmsnorm-rope-fusion/">
+  <meta property="og:site_name" content="Atomage&#39;s Blog">
+  <meta property="og:title" content="Split QKV &#43; RMSNorm &#43; RoPE 融合算子">
+  <meta property="og:description" content="源代码: vllm-ascend/vllm_ascend/ops/triton/linearnorm/split_qkv_rmsnorm_rope.py
+背景# 问题：内存墙# LLM 推理（尤其是 decode 阶段）是典型的 memory-bound 场景。每一次算子调用都是一次「从 Global Memory 搬数据到片上 → 计算 → 搬回 Global Memory」的循环。如果不融合，Split QKV → RMSNorm → RoPE 这三个步骤各自独立执行：
+非融合流程: hidden_states ──[load]──&gt; Split Q,K,V ──[store]──&gt; q_in, k_in, v_in q_in ──[load]──&gt; RMSNorm ──[store]──&gt; q_normed k_in ──[load]──&gt; RMSNorm ──[store]──&gt; k_normed q_normed ──[load]──&gt; RoPE ──[store]──&gt; q_out k_normed ──[load]──&gt; RoPE ──[store]──&gt; k_out 每一次 load/store 都是一次 GM ↔ UB 的数据搬运。数据在总线上反复进出，但实际的计算量（几个乘加 &#43; 一个开方）极小——这就是 memory-bandwidth bottleneck。">
+  <meta property="og:locale" content="zh_cn">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2026-05-26T09:50:58+08:00">
+    <meta property="article:modified_time" content="2026-05-26T09:50:58+08:00">
+    <meta property="article:tag" content="Kernel">
+    <meta property="article:tag" content="Vllm">
+    <meta property="article:tag" content="Inference">
+    <meta property="article:tag" content="Ai">
+    <meta property="article:tag" content="Ascend">
+
+  <meta itemprop="name" content="Split QKV &#43; RMSNorm &#43; RoPE 融合算子">
+  <meta itemprop="description" content="源代码: vllm-ascend/vllm_ascend/ops/triton/linearnorm/split_qkv_rmsnorm_rope.py
+背景# 问题：内存墙# LLM 推理（尤其是 decode 阶段）是典型的 memory-bound 场景。每一次算子调用都是一次「从 Global Memory 搬数据到片上 → 计算 → 搬回 Global Memory」的循环。如果不融合，Split QKV → RMSNorm → RoPE 这三个步骤各自独立执行：
+非融合流程: hidden_states ──[load]──&gt; Split Q,K,V ──[store]──&gt; q_in, k_in, v_in q_in ──[load]──&gt; RMSNorm ──[store]──&gt; q_normed k_in ──[load]──&gt; RMSNorm ──[store]──&gt; k_normed q_normed ──[load]──&gt; RoPE ──[store]──&gt; q_out k_normed ──[load]──&gt; RoPE ──[store]──&gt; k_out 每一次 load/store 都是一次 GM ↔ UB 的数据搬运。数据在总线上反复进出，但实际的计算量（几个乘加 &#43; 一个开方）极小——这就是 memory-bandwidth bottleneck。">
+  <meta itemprop="datePublished" content="2026-05-26T09:50:58+08:00">
+  <meta itemprop="dateModified" content="2026-05-26T09:50:58+08:00">
+  <meta itemprop="wordCount" content="1531">
+  <meta itemprop="keywords" content="Kernel,Vllm,Inference,Ai,Ascend">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Split QKV &#43; RMSNorm &#43; RoPE 融合算子">
+  <meta name="twitter:description" content="源代码: vllm-ascend/vllm_ascend/ops/triton/linearnorm/split_qkv_rmsnorm_rope.py
+背景# 问题：内存墙# LLM 推理（尤其是 decode 阶段）是典型的 memory-bound 场景。每一次算子调用都是一次「从 Global Memory 搬数据到片上 → 计算 → 搬回 Global Memory」的循环。如果不融合，Split QKV → RMSNorm → RoPE 这三个步骤各自独立执行：
+非融合流程: hidden_states ──[load]──&gt; Split Q,K,V ──[store]──&gt; q_in, k_in, v_in q_in ──[load]──&gt; RMSNorm ──[store]──&gt; q_normed k_in ──[load]──&gt; RMSNorm ──[store]──&gt; k_normed q_normed ──[load]──&gt; RoPE ──[store]──&gt; q_out k_normed ──[load]──&gt; RoPE ──[store]──&gt; k_out 每一次 load/store 都是一次 GM ↔ UB 的数据搬运。数据在总线上反复进出，但实际的计算量（几个乘加 &#43; 一个开方）极小——这就是 memory-bandwidth bottleneck。">
+
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+
+  </head>
+
+  <body class="ma0 avenir bg-near-white">
+
+    
+
+  <header>
+    <div class="bg-black">
+      <nav class="pv3 ph3 ph4-ns" role="navigation">
+  <div class="flex-l justify-between items-center center">
+    <a href="../../" class="f3 fw2 hover-white no-underline white-90 dib">
+      
+        <img src="../../images/site-logo.svg" class="w100 mw5-ns" alt="Atomage&#39;s Blog" />
+      
+    </a>
+    <div class="flex-l items-center">
+      
+
+      
+        <ul class="pl0 mr3">
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="../../archives/" title="⏱️Archives page">
+              ⏱️Archives
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="../../posts/" title="📎Posts page">
+              📎Posts
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="../../about/" title="🙋🏻‍♂️About page">
+              🙋🏻‍♂️About
+            </a>
+          </li>
+          
+        </ul>
+      
+      
+<div class="ananke-socials">
+  
+    
+    <a href="https://github.com/ZhongsJie" target="_blank" rel="noopener" class="github ananke-social-link link-transition stackoverflow link dib z-999 pt3 pt0-l mr1" title="GitHub link" aria-label="follow on GitHub——Opens in a new window">
+      
+        <span class="icon"><svg style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+</span>
+      
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;"/>
+</svg>
+</span></a>
+  
+</div>
+
+    </div>
+  </div>
+</nav>
+
+    </div>
+  </header>
+
+
+    <main class="pb7" role="main">
+      
+<div class="flex-l mt2 mw8 center">
+  <article class="center cf pv5 ph3 ph4-ns mw7">
+    <header>
+      <p class="f6 b helvetica tracked">
+        POSTS
+      </p>
+      <h1 class="f1">
+        Split QKV &#43; RMSNorm &#43; RoPE 融合算子
+      </h1>
+    </header>
+    <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray">
+      <blockquote>
+<p><strong>源代码</strong>: <code>vllm-ascend/vllm_ascend/ops/triton/linearnorm/split_qkv_rmsnorm_rope.py</code></p>
+</blockquote>
+<h2 id="背景">
+    背景<a class="hash-link" href="#%e8%83%8c%e6%99%af" title="Direct link to heading">#</a>
+</h2><h3 id="问题内存墙">
+    问题：内存墙<a class="hash-link" href="#%e9%97%ae%e9%a2%98%e5%86%85%e5%ad%98%e5%a2%99" title="Direct link to heading">#</a>
+</h3><p>LLM 推理（尤其是 decode 阶段）是典型的 <strong>memory-bound</strong> 场景。每一次算子调用都是一次「从 Global Memory 搬数据到片上 → 计算 → 搬回 Global Memory」的循环。如果不融合，Split QKV → RMSNorm → RoPE 这三个步骤各自独立执行：</p>
+<pre tabindex="0"><code>非融合流程:
+  hidden_states ──[load]──&gt; Split Q,K,V ──[store]──&gt; q_in, k_in, v_in
+  q_in ──[load]──&gt; RMSNorm ──[store]──&gt; q_normed
+  k_in ──[load]──&gt; RMSNorm ──[store]──&gt; k_normed
+  q_normed ──[load]──&gt; RoPE ──[store]──&gt; q_out
+  k_normed ──[load]──&gt; RoPE ──[store]──&gt; k_out
+</code></pre><p>每一次 <code>load/store</code> 都是一次 GM ↔ UB 的数据搬运。数据在总线上反复进出，但实际的计算量（几个乘加 + 一个开方）极小——这就是 <strong>memory-bandwidth bottleneck</strong>。</p>
+<h3 id="融合的收益">
+    融合的收益<a class="hash-link" href="#%e8%9e%8d%e5%90%88%e7%9a%84%e6%94%b6%e7%9b%8a" title="Direct link to heading">#</a>
+</h3><pre tabindex="0"><code>融合流程:
+  hidden_states ──[load one time]──&gt;
+    在 UB 内依次完成: Split → RMSNorm → Weight → RoPE
+  ──[store one time]──&gt; q_out, k_out
+  v_in ──[copy]──&gt; v_out
+</code></pre><p>数据<strong>只进出一次 GM</strong>，中间所有计算都在片上 UB 完成。把 memory-bound 问题部分转化为 compute-bound，大幅降低延迟。</p>
+<blockquote>
+<p>在 NPU 上，一次 GM 访问的延迟通常是 UB 访问的数百倍。融合算子省掉的中间 store/load 往往是最大的性能来源，而非计算本身的加速。</p>
+</blockquote>
+<h3 id="内存层次与关键概念">
+    内存层次与关键概念<a class="hash-link" href="#%e5%86%85%e5%ad%98%e5%b1%82%e6%ac%a1%e4%b8%8e%e5%85%b3%e9%94%ae%e6%a6%82%e5%bf%b5" title="Direct link to heading">#</a>
+</h3><p><em>Triton-Ascend 相关内容请参阅 Triton-Ascend 笔记。</em></p>
+<table>
+  <thead>
+      <tr>
+          <th>概念</th>
+          <th>全称</th>
+          <th>容量</th>
+          <th>用途</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td><strong>GM</strong></td>
+          <td>Global Memory</td>
+          <td>GB 级</td>
+          <td>存储输入/输出/参数，所有 Core 共享，访问延迟高</td>
+      </tr>
+      <tr>
+          <td><strong>UB</strong></td>
+          <td>Unified Buffer</td>
+          <td><strong>192KB</strong> (A2/A3)</td>
+          <td>Vector Core 独占的片上 SRAM，延迟极低</td>
+      </tr>
+      <tr>
+          <td><strong>L1 Buffer</strong></td>
+          <td>—</td>
+          <td>~1MB (A2 512KB)</td>
+          <td>Cube Core 独占，用于矩阵乘法数据</td>
+      </tr>
+      <tr>
+          <td><strong>VectorCore</strong></td>
+          <td>向量核心</td>
+          <td>per AI Core ×2</td>
+          <td>执行逐元素运算、归约、激活函数</td>
+      </tr>
+      <tr>
+          <td><strong>AICore</strong></td>
+          <td>AI 核心</td>
+          <td>—</td>
+          <td>硬件调度最小单元，含 1 Cube + 2 Vector</td>
+      </tr>
+  </tbody>
+</table>
+<p>UB 是 Vector 核的片上存储，所有计算都在 UB 中进行。数据流为：</p>
+<pre tabindex="0"><code>Global Memory (GM) → [tl.load] → UB → [Vector 计算] → UB → [tl.store] → GM
+</code></pre><table>
+  <thead>
+      <tr>
+          <th>芯片型号</th>
+          <th>UB 容量</th>
+          <th>可用上限 (Double Buffering)</th>
+          <th>建议使用量</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>910B</td>
+          <td>192 KB</td>
+          <td>96 KB</td>
+          <td>~85 KB</td>
+      </tr>
+  </tbody>
+</table>
+<h3 id="triton-ascend-编程关键约束">
+    Triton-Ascend 编程关键约束<a class="hash-link" href="#triton-ascend-%e7%bc%96%e7%a8%8b%e5%85%b3%e9%94%ae%e7%ba%a6%e6%9d%9f" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>ascend/agent-skills 中对 Triton 编程存在一些约束</p>
+</blockquote>
+<ol>
+<li><strong>Mask 必加</strong>：Ascend 对越界访问<strong>零容错</strong>。所有 <code>tl.load</code>/<code>tl.store</code> 必须带 <code>mask</code> 参数</li>
+<li><strong>归约升 FP32</strong>：FP16/BF16 的 sum/mean 归约前必须 <code>.to(tl.float32)</code>，否则精度灾难</li>
+<li><strong>Grid = VectorCore 数</strong>：不含 <code>tl.dot</code> 的逐元素 kernel，grid 应设为物理 VectorCore 数量（本代码正是如此）</li>
+<li><strong>单 pass 原则</strong>：数据加载一次到 UB，在 UB 内完成全部计算后写回——避归约类算子的双 pass 反模式（一次 load 算统计量、二次 load 做归一化）</li>
+<li><strong>循环内禁分支</strong>：Triton 将 if 分支编译为 masked 操作，循环内修改变量会导致灾难性性能下降</li>
+<li><strong>连续访存优先</strong>：连续内存访问才能触发 DMA 引擎大块传输，非连续 stride 访问会把一次 load 拆成数百条小指令</li>
+</ol>
+<h2 id="归一化layernorm-vs-rmsnorm">
+    归一化：LayerNorm vs RMSNorm<a class="hash-link" href="#%e5%bd%92%e4%b8%80%e5%8c%96layernorm-vs-rmsnorm" title="Direct link to heading">#</a>
+</h2><h3 id="标准-layernorm">
+    标准 LayerNorm<a class="hash-link" href="#%e6%a0%87%e5%87%86-layernorm" title="Direct link to heading">#</a>
+</h3><p><strong>标准 LayerNorm</strong> 对一个向量同时做去均值 (centering) 和缩放 (scaling)：</p>
+$$\text{LayerNorm}(x) = \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}} \odot \gamma + \beta ,\quad  \mu = \frac{1}{H}\sum x_i ,\quad  \sigma^2 = \frac{1}{H}\sum(x_i - \mu)^2$$<ul>
+<li>$\mathbf{x} \in \mathbb{R}^{H}$ — 单 token 的隐状态向量</li>
+<li>$\mu, \sigma^{2} \in \mathbb{R}$ — 在 <code>H</code> 维上算的均值和方差</li>
+<li>$\epsilon$ — 防除零小常数（通常 <code>10^{-5}</code>）</li>
+<li>$\boldsymbol{\gamma}, \boldsymbol{\beta} \in \mathbb{R}^{H}$ — 可学习的 scale / shift</li>
+<li>$\odot$ — 逐元素乘</li>
+</ul>
+<h3 id="rmsnorm">
+    RMSNorm<a class="hash-link" href="#rmsnorm" title="Direct link to heading">#</a>
+</h3><p><strong>RMSNorm</strong> 舍弃了均值步骤，只保留 RMS（Root Mean Square）缩放：</p>
+$$\text{RMSNorm}(x) = \frac{x}{\text{RMS}(x)} \odot \gamma,\quad \text{RMS}(x) = \sqrt{\frac{1}{H}\sum_{i=1}^{H} x_i^2 + \epsilon}$$<ul>
+<li>$\mathbf{x} \in \mathbb{R}^{H}$ — 单 token 的隐状态向量</li>
+<li>$\epsilon$ — 防除零小常数（通常 <code>10^{-5}</code>）</li>
+<li>$\boldsymbol{\gamma} \in \mathbb{R}^{H}$ — 可学习的 per-channel scale（无 $\boldsymbol{\beta}$）</li>
+<li>$\odot$ — 逐元素乘</li>
+<li>分母为 $x$ 的均方根（root mean square），故得名 RMSNorm</li>
+</ul>
+<p>RMSNorm 优势：</p>
+<ul>
+<li><strong>计算更简单</strong>：RMSNorm 省了均值、也省了 $\beta$，计算量和参数都约减半（约减少 30-40% 的 FLOP）；</li>
+<li><strong>效果不减</strong>：2023 年 Biao Zhang 等人的论文 <em>Root Mean Square Layer Normalization</em> 证明 RMSNorm 在大多数场景下与 LayerNorm 性能相当甚至更优；</li>
+<li><strong>推理生态的推动</strong>：LLaMA 全系、Qwen、DeepSeek 等主流模型均采用 RMSNorm，按 <strong>pre-norm</strong> 组织：norm 在残差分支内部，残差主干不经过 norm。</li>
+</ul>
+<h2 id="qkv-投影--rope">
+    Q/K/V 投影 + RoPE<a class="hash-link" href="#qkv-%e6%8a%95%e5%bd%b1--rope" title="Direct link to heading">#</a>
+</h2><h3 id="qkv-投影">
+    QKV 投影<a class="hash-link" href="#qkv-%e6%8a%95%e5%bd%b1" title="Direct link to heading">#</a>
+</h3>$$Q=XW_Q,\quad K=XW_K, \quad V=XW_V$$<ul>
+<li>$X \in \mathbb{R}^{B \times S \times H}$：上一步 RMSNorm 的输出</li>
+<li>$W_Q \in \mathbb{R}^{H \times n_q \times d}$：Q 投影权重</li>
+<li>$W_K,W_V \in \mathbb{R}^{H \times n_{kv} \times d}$：K、V 投影权重（GQA 下 $n_{kv}<n_q$，所以更窄）</li>
+<li>$Q \in \mathbb{R}^{B \times S \times n_q \times d}$，$K,V \in \mathbb{R}^{B \times S \times n_{kv} \times d}$：投影输出，会再 reshape 出 head 维</li>
+</ul>
+<h3 id="rope">
+    RoPE<a class="hash-link" href="#rope" title="Direct link to heading">#</a>
+</h3><p>Self-Attention 本身是<strong>置换等变</strong>的（对 token 顺序不敏感），必须通过位置编码注入序列位置信息。RoPE (Rotary Position Embedding) 是当前最主流的位置编码方案。RoPE 的核心洞察：与其把&quot;绝对位置 $m$&ldquo;加到 embedding 上（像原始 Transformer 的 sinusoidal），不如让位置以<strong>旋转</strong>的形式作用在 Q、K 上，使两个向量做内积时只剩下<strong>相对位置</strong> $n-m$。</p>
+<p>对位置 $m$ 的 token，在维度对 $(2k, 2k+1)$ 上应用角度为 $m\theta_k$ 的 2D 旋转：</p>
+<p><strong>复数域的旋转</strong>：$q_k' = q_k \cdot e^{im\theta_k}$，其中 $q_k = x_{2k} + i x_{2k+1}$ 是相邻两维构成的复数。<strong>展开到实数域</strong>：</p>
+$$\begin{bmatrix} x_{2k}'(m) \\\ x_{2k+1}'(m) \end{bmatrix} = \begin{bmatrix} \cos(m\theta_k) & -\sin(m\theta_k) \\\ \sin(m\theta_k) & \cos(m\theta_k) \end{bmatrix} \begin{bmatrix} x_{2k} \\\ x_{2k+1} \end{bmatrix}$$<ul>
+<li>$m \in \{0,1,\dots,S-1\}$ — 当前 token 的绝对位置</li>
+<li>$k \in \{0,1,\dots,d/2-1\}$：二维子空间索引（在单头维度 $d$ 上每两维一组）</li>
+<li>$(q_{2k},q_{2k+1})$ — 投影后 Q 向量的第 $k$ 个 2D pair</li>
+<li>$(q_{2k}'(m),q_{2k+1}'(m))$ — 在位置 $m$ 旋转后</li>
+<li>$\theta_k$ — 第 $k$ 个子空间的基础角速度</li>
+<li>base — 频率衰减基（YaRN 等方式会动态拉大）</li>
+</ul>
+<p>即：</p>
+$$x_{2k}' = x_{2k} \cdot \cos(m\theta_k) - x_{2k+1} \cdot \sin(m\theta_k)$$$$x_{2k+1}' = x_{2k+1} \cdot \cos(m\theta_k) + x_{2k} \cdot \sin(m\theta_k)$$<p>对于位置 $m$，维度索引 $k$，<strong>频率定义</strong>为：</p>
+$$\theta_k = \text{base}^{-\frac{2k}{d}}, \quad k \in [0, 1, \dots, d/2-1]$$<p>其中 base 通常为 10000（LLaMA）。对于 head_dim = 128，rope_dim = 128 的例子：</p>
+<ul>
+<li>有 64 个维度对 $(2k, 2k+1)$</li>
+<li>每个对的旋转角 $\theta_k = 10000^{-2k/128} = 10000^{-k/64}$</li>
+<li>cos/sin 缓存预计算为 <code>[max_position, rope_dim]</code> 形状</li>
+<li>缓存布局：前半 <code>rope_dim/2</code> 个元素是 cos，后半 <code>rope_dim/2</code> 个是 sin</li>
+</ul>
+<p><strong>频率谱设计</strong>：$\theta_k = \text{base}^{-\frac{2k}{d}}, \quad k \in [0, 1, \dots, d/2-1]$ 让 $d/2$ 个子空间分到从快到慢的角速度：</p>
+<ul>
+<li>$k=0：\theta_0=1$，周期 $2\pi \approx 6.28$ token，承担&quot;近邻&quot;信号。</li>
+<li>$k=d/2-1：\theta \approx \text{base}^{-(d-2)/d} \approx 10^{-4}$，周期 $\approx 2\pi \cdot 10000 \approx 6.28$ 万 token，承担&quot;远距离&quot;信号。</li>
+</ul>
+<p>几何级数分布让一个 head 内同时携带不同尺度的位置信号 — 与原始 Transformer 的 sinusoidal 同构，只是从加法搬到了乘法。</p>
+<p><strong>长上下文缩放</strong>：训练只见过 $m \leq L_{train}$，低频子空间在 $L_{train}$ 内甚至跑不完一个周期；推理一旦 $m > L_{train}$，低频角度进入训练分布外，attention 立刻退化。三类常见解法都在改 $\theta_k$：</p>
+<ul>
+<li><strong>Position Interpolation</strong>（Chen et al. 2023）：$m \to m/s$，等价 $\theta_k \to \theta_k/s$ 同比例压缩所有频率。简单但牺牲高频精度。</li>
+<li><strong>NTK-aware scaling</strong>：只缩放低频、保留高频，等价于 $\text{base} \to \text{base} \cdot s^{d/(d-2)}$。</li>
+<li><strong>YaRN</strong>（Peng et al. 2023）：分频段处理 — 高频（周期 $\ll L_{train}$，已学过完整周期）不变，低频（周期 $\gg L_{train}$，没学过完整周期）按 PI 缩放，中间段平滑过渡，再叠加一个 $1/\sqrt{t}$ 的温度修正抵消缩放带来的注意力熵漂移。</li>
+</ul>
+<p>RoPE 只作用于 Q、K，<em>不作用于 V</em> — V 是被加权求和的值本身，不需要位置信号。</p>
+<h3 id="partial-rope">
+    Partial RoPE<a class="hash-link" href="#partial-rope" title="Direct link to heading">#</a>
+</h3><p>在常规 RoPE 里，一层注意力的每个 head 的 q/k 向量维度是 d，例如 d = 128。RoPE 会把这 d 维拆成很多二维小平面，对每个小平面按位置做一次复数旋转（相当于在 2D 平面里转一个角度），这样：</p>
+<ul>
+<li>每个位置 $i$ 的 $q_i、k_i$ 都被乘上不同的复数，相当于嵌入了位置信息；</li>
+<li>所有维度都带上了相对位置信息（full RoPE）。</li>
+</ul>
+<blockquote>
+<p>所有 q/k 维度都「绑死」在 RoPE 上，<strong>远距离时高频维旋转很快</strong>，容易<strong>干扰某些「召回远程 token」的头</strong>（induction heads），也会和各种压缩技巧（MLA、低秩 KV 等）产生冲突。</p>
+</blockquote>
+<p>Partial RoPE 做了一个简单但非常有用的改变，把 <strong>q/k 维度拆成两部分</strong>：</p>
+<ul>
+<li>一部分维度继续用 RoPE（带位置）；</li>
+<li>另一部分维度完全不用 RoPE，当作 <strong>NoPE 纯语义维度</strong>。</li>
+</ul>
+<p>形式上可以理解为：</p>
+<ul>
+<li>$q = [q_{rope}, q_{nope}]$</li>
+<li>$k = [k_{rope}, k_{nope}]$</li>
+</ul>
+<p>其中：</p>
+<ul>
+<li>$q_{rope}, k_{rope}$：这部分会按位置做旋转，负责「位置敏感」的信息；</li>
+<li>$q_{nope}, k_{nope}$：这部分不做旋转，始终保持与位置无关，更适合作为「纯内容 / 语义」或「压缩」空间。</li>
+</ul>
+<p>这就是「partial」的含义：<strong>RoPE 只施加在部分维度</strong>上。现实中使用 partial RoPE 的模型很多——只有前 <code>rope_dim</code> 维参与旋转，剩余维度保持原值（例如 DeepSeek V2/V3, MLA 的 $[q_c, q_r]$、$[k_c, k_r]$ 拼接）。kernel 中通过 <code>IS_PARTIAL_ROPE</code> 常量控制：RoPE 旋转只应用到前 <code>rope_dim</code> 维，后 <code>head_dim - rope_dim</code> 维保留 RMSNorm 归一化后的原始值。</p>
+<h3 id="neox-style-vs-interleaved">
+    Neox-style vs Interleaved<a class="hash-link" href="#neox-style-vs-interleaved" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>Neox-style / GPT-NeoX-style 和 Interleaved，是 <strong>RoPE 在 head_dim 里的维度布局格式（layout）</strong>，目的都是：把 q/k 的实数向量拆成一堆 2D 小平面（复数对），方便做旋转。但这两种 layout 在「怎么把这些 2D 对映射到连续维度」上做法不一样。</p>
+</blockquote>
+<p><strong>Neox-style (GPT-NeoX)</strong></p>
+$$[x_0, x_1, x_2, x_3, ..., x_{d-2}, x_{d-1}]$$<ul>
+<li>$\mathbb{x}_1 = [x_0, x_1, ..., x_{d/2-1}]$（前半段）</li>
+<li>$\mathbb{x}_2 = [x_{d/2}, x_{d/2+1}, ..., x_{d-1}]$（后半段）</li>
+<li><strong>cos/sin</strong> 频率按 <em>&ldquo;块状/顺序&rdquo;</em> 布局，非常适合 GPU kernel 里连续内存访问。</li>
+</ul>
+<p><strong>Interleaved</strong></p>
+$$[x_{0_{cos}}, x_{0_{sin}}, x_{1_{cos}}, x_{1_{sin}}, ...]$$<ul>
+<li>这样一个频率对应的 cos / sin 紧挨着，更像「(real, imag) interleave」</li>
+</ul>
+<p>这种 layout 在一些多维 RoPE / MRoPE / Vision RoPE 里更自然：</p>
+<ul>
+<li>一段维度对应一个 axis 的 cos/sin；</li>
+<li>interleave 以后，每个 axis 的 cos/sin 成对地挨在一起，方便在 kernel 里按 axis 做操作。</li>
+</ul>
+<p>两种布局格式，<strong>差异主要体现在内存访问模式和 kernel 实现便利性</strong>上。</p>
+<p>vllm 中通过 <code>is_neox</code> 参数来区分是否是 Neox-style (<code>vllm.model_executor.layers.rotary_embedding.common</code>)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>_flashinfer_rotary_embedding(
+</span></span><span style="display:flex;"><span>    positions: Tensor,
+</span></span><span style="display:flex;"><span>    query: Tensor,
+</span></span><span style="display:flex;"><span>    key: Tensor,
+</span></span><span style="display:flex;"><span>    head_size: int,
+</span></span><span style="display:flex;"><span>    cos_sin_cache: Tensor,
+</span></span><span style="display:flex;"><span>    is_neox: bool, <span style="color:#75715e"># 用于区分是否是neox-style布局</span>
+</span></span><span style="display:flex;"><span>) <span style="color:#f92672">-&gt;</span> <span style="color:#66d9ef">None</span>
+</span></span></code></pre></div><h2 id="split-qkv--rmsnorm--rope-算子融合">
+    Split QKV + RMSNorm + RoPE 算子融合<a class="hash-link" href="#split-qkv--rmsnorm--rope-%e7%ae%97%e5%ad%90%e8%9e%8d%e5%90%88" title="Direct link to heading">#</a>
+</h2><p>原始处理逻辑：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>q, k, v <span style="color:#f92672">=</span> qkv<span style="color:#f92672">.</span>split([self<span style="color:#f92672">.</span>q_size, self<span style="color:#f92672">.</span>kv_size, self<span style="color:#f92672">.</span>kv_size], dim<span style="color:#f92672">=-</span><span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>q_by_head <span style="color:#f92672">=</span> q<span style="color:#f92672">.</span>view(<span style="color:#f92672">*</span>q<span style="color:#f92672">.</span>shape[:<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>], q<span style="color:#f92672">.</span>shape[<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>] <span style="color:#f92672">//</span> self<span style="color:#f92672">.</span>head_dim, self<span style="color:#f92672">.</span>head_dim)
+</span></span><span style="display:flex;"><span>q_norm_out, _ <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>ops<span style="color:#f92672">.</span>npu<span style="color:#f92672">.</span>npu_rms_norm(q_by_head, q_weight, self<span style="color:#f92672">.</span>eps)
+</span></span><span style="display:flex;"><span>q_normed <span style="color:#f92672">=</span> q_norm_out <span style="color:#f92672">+</span> q_bias
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>k_by_head <span style="color:#f92672">=</span> k<span style="color:#f92672">.</span>view(<span style="color:#f92672">*</span>k<span style="color:#f92672">.</span>shape[:<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>], k<span style="color:#f92672">.</span>shape[<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>] <span style="color:#f92672">//</span> self<span style="color:#f92672">.</span>head_dim, self<span style="color:#f92672">.</span>head_dim)
+</span></span><span style="display:flex;"><span>k_norm_out, _ <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>ops<span style="color:#f92672">.</span>npu<span style="color:#f92672">.</span>npu_rms_norm(k_by_head, k_weight, self<span style="color:#f92672">.</span>eps)
+</span></span><span style="display:flex;"><span>k_normed <span style="color:#f92672">=</span> k_norm_out <span style="color:#f92672">+</span> k_bias
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>q_flat <span style="color:#f92672">=</span> q_normed<span style="color:#f92672">.</span>view(q<span style="color:#f92672">.</span>shape)
+</span></span><span style="display:flex;"><span>k_flat <span style="color:#f92672">=</span> k_normed<span style="color:#f92672">.</span>view(k<span style="color:#f92672">.</span>shape)
+</span></span><span style="display:flex;"><span>q_rope, k_rope <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>ops<span style="color:#f92672">.</span>vllm<span style="color:#f92672">.</span>npu_rotary_embedding(
+</span></span><span style="display:flex;"><span>    positions, q_flat, k_flat, cos_sin_cache, self<span style="color:#f92672">.</span>head_dim, self<span style="color:#f92672">.</span>rope_dim, <span style="color:#66d9ef">True</span>
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><ul>
+<li>在原始计算逻辑中，需要频繁进行数据搬运</li>
+</ul>
+<p>整体计算流程：</p>
+<pre tabindex="0"><code>Input: hidden_states [batch_size, total_hidden_size]
+  total_hidden_size = q_hidden_size + kv_hidden_size × 2
+                                          ↓
+              ┌───────────────────────────┼───────────────────────────┐
+              │                           │                           │
+          Q-channel                  K-channel                   V-channel
+     [0 : q_hidden_size)    [q_hidden_size :                 [q_hidden_size +
+                             q_hidden_size+kv_hidden_size)   2*kv_hidden_size : ]
+              │                           │                           │
+              ↓                           ↓                           ↓
+      Reshape → [B, QH, HD]     Reshape → [B, KVH, HD]        Direct Copy
+              │                           │
+              ↓                           ↓
+          RMSNorm                     RMSNorm
+      x / sqrt(mean(x²)+eps)     x / sqrt(mean(x²)+eps)
+              │                           │
+              ↓                           ↓
+        Weight + Bias               Weight + Bias
+              │                           │
+              ↓                           ↓
+            RoPE                        RoPE
+     x1·cos - x2·sin              x1·cos - x2·sin
+     x2·cos + x1·sin              x2·cos + x1·sin
+              │                           │
+              ↓                           ↓
+          Q_out [B, q_hs]          K_out [B, kv_hs]          V_out [B, kv_hs]
+</code></pre><h3 id="源码分析">
+    源码分析<a class="hash-link" href="#%e6%ba%90%e7%a0%81%e5%88%86%e6%9e%90" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>该源码分析基于 vllm-ascend split_qkv_rmsnorm_rope.py 的代码实现，其中主要逻辑针对 NPU 特点进行优化调整。</p>
+</blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#a6e22e">@triton.jit</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">split_qkv_rmsnorm_rope_kernel</span>(
+</span></span><span style="display:flex;"><span>    input_gm_ptr,
+</span></span><span style="display:flex;"><span>    q_gm_ptr,
+</span></span><span style="display:flex;"><span>    k_gm_ptr,
+</span></span><span style="display:flex;"><span>    v_gm_ptr,
+</span></span><span style="display:flex;"><span>    q_weight_ptr,
+</span></span><span style="display:flex;"><span>    q_bias_ptr,
+</span></span><span style="display:flex;"><span>    k_weight_ptr,
+</span></span><span style="display:flex;"><span>    k_bias_ptr,
+</span></span><span style="display:flex;"><span>    batch_size,
+</span></span><span style="display:flex;"><span>    q_hidden_size: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    kv_hidden_size: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    total_hidden_size: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    eps: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    BIAS: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    HEAD_DIM: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    ROPE_DIM: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    HALF_ROPE_DIM: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    IS_PARTIAL_ROPE: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    num_vectorcore: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    batch_size_per_iter_per_vec: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    qk_head_nums_per_iter_per_vec: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    q_head_num: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    kv_head_num: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    qk_head_num_sum: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    v_batch_size_per_iter_per_vec: tl<span style="color:#f92672">.</span>constexpr,
+</span></span><span style="display:flex;"><span>    positions_gm_ptr,
+</span></span><span style="display:flex;"><span>    cos_sin_cache_gm_ptr,
+</span></span><span style="display:flex;"><span>):
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># =========================================================================</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 第一部分：初始化和准备工作</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># =========================================================================</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 获取当前 block 的 ID，用于并行处理不同的 batch 维度</span>
+</span></span><span style="display:flex;"><span>    row_pid <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>program_id(<span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 加载 RMSNorm 的权重参数 (q_weight, k_weight)，用于后续归一化</span>
+</span></span><span style="display:flex;"><span>    q_weight_values <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>load(q_weight_ptr <span style="color:#f92672">+</span> tl<span style="color:#f92672">.</span>arange(<span style="color:#ae81ff">0</span>, HEAD_DIM))
+</span></span><span style="display:flex;"><span>    k_weight_values <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>load(k_weight_ptr <span style="color:#f92672">+</span> tl<span style="color:#f92672">.</span>arange(<span style="color:#ae81ff">0</span>, HEAD_DIM))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># =========================================================================</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 第二部分：计算 tiling 参数 (UB 192kb,在实际使用过程中建议不超过85kb)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># =========================================================================</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 将 batch 均匀分配到 num_vectorcore 个向量核上并行处理</span>
+</span></span><span style="display:flex;"><span>    batch_size_per_vec <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>cdiv(batch_size, num_vectorcore)
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 每个向量核需要处理的迭代次数</span>
+</span></span><span style="display:flex;"><span>    iter_num_per_vec <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>cdiv(batch_size_per_vec, batch_size_per_iter_per_vec)
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># V 分支的迭代次数 (可能使用不同的 tiling)</span>
+</span></span><span style="display:flex;"><span>    v_iter_num_per_vec <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>cdiv(batch_size_per_vec, v_batch_size_per_iter_per_vec)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 计算当前向量核处理的 batch 起始偏移</span>
+</span></span><span style="display:flex;"><span>    input_batch_offset <span style="color:#f92672">=</span> row_pid <span style="color:#f92672">*</span> batch_size_per_vec
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># =========================================================================</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 第三部分：建立索引和 mask</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># =========================================================================</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># mblk_idx: 当前迭代处理的 batch 索引</span>
+</span></span><span style="display:flex;"><span>    mblk_idx <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>arange(<span style="color:#ae81ff">0</span>, batch_size_per_iter_per_vec) <span style="color:#f92672">+</span> input_batch_offset
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># nblk_idx: hidden_size 维度索引 (Q + KV 部分)</span>
+</span></span><span style="display:flex;"><span>    nblk_idx <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>arange(<span style="color:#ae81ff">0</span>, q_hidden_size <span style="color:#f92672">+</span> kv_hidden_size)
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># nmask: 有效数据范围的 mask</span>
+</span></span><span style="display:flex;"><span>    nmask <span style="color:#f92672">=</span> nblk_idx <span style="color:#f92672">&lt;</span> total_hidden_size
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 计算当前向量核处理的 batch 结束边界</span>
+</span></span><span style="display:flex;"><span>    input_batch_offset_end <span style="color:#f92672">=</span> min(input_batch_offset <span style="color:#f92672">+</span> batch_size_per_vec, batch_size)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 位置索引，用于从 positions 数组中获取每个 token 的位置</span>
+</span></span><span style="display:flex;"><span>    pos_indices <span style="color:#f92672">=</span> input_batch_offset <span style="color:#f92672">+</span> tl<span style="color:#f92672">.</span>arange(<span style="color:#ae81ff">0</span>, batch_size_per_iter_per_vec)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 输出索引相关</span>
+</span></span><span style="display:flex;"><span>    output_q_nblk_idx <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>arange(<span style="color:#ae81ff">0</span>, q_hidden_size)
+</span></span><span style="display:flex;"><span>    output_q_nmask <span style="color:#f92672">=</span> output_q_nblk_idx <span style="color:#f92672">&lt;</span> q_hidden_size
+</span></span><span style="display:flex;"><span>    output_kv_nblk_idx <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>arange(<span style="color:#ae81ff">0</span>, kv_hidden_size)
+</span></span><span style="display:flex;"><span>    output_kv_nmask <span style="color:#f92672">=</span> output_kv_nblk_idx <span style="color:#f92672">&lt;</span> kv_hidden_size
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># RoPE cos/sin 缓存的地址偏移</span>
+</span></span><span style="display:flex;"><span>    sin_cos_range <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>arange(<span style="color:#ae81ff">0</span>, ROPE_DIM)
+</span></span><span style="display:flex;"><span>    cos_sin_cache_offset <span style="color:#f92672">=</span> cos_sin_cache_gm_ptr <span style="color:#f92672">+</span> sin_cos_range
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># =========================================================================</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 第四部分：Q 和 K 的处理循环 (核心计算)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># =========================================================================</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> iter <span style="color:#f92672">in</span> tl<span style="color:#f92672">.</span>range(iter_num_per_vec):
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 计算当前迭代的偏移量</span>
+</span></span><span style="display:flex;"><span>        pos_offset <span style="color:#f92672">=</span> iter <span style="color:#f92672">*</span> batch_size_per_iter_per_vec
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 4.1 获取位置索引</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        x <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>load(
+</span></span><span style="display:flex;"><span>            positions_gm_ptr <span style="color:#f92672">+</span> pos_indices <span style="color:#f92672">+</span> pos_offset,
+</span></span><span style="display:flex;"><span>            mask<span style="color:#f92672">=</span>(pos_indices <span style="color:#f92672">+</span> pos_offset) <span style="color:#f92672">&lt;</span> input_batch_offset_end
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 计算数据加载的 mask</span>
+</span></span><span style="display:flex;"><span>        mmask <span style="color:#f92672">=</span> (mblk_idx <span style="color:#f92672">+</span> pos_offset) <span style="color:#f92672">&lt;</span> input_batch_offset_end
+</span></span><span style="display:flex;"><span>        mask <span style="color:#f92672">=</span> (mmask[:, <span style="color:#66d9ef">None</span>]) <span style="color:#f92672">&amp;</span> (nmask[<span style="color:#66d9ef">None</span>, :])
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 计算全局内存地址索引</span>
+</span></span><span style="display:flex;"><span>        idx <span style="color:#f92672">=</span> (mblk_idx <span style="color:#f92672">+</span> pos_offset)[:, <span style="color:#66d9ef">None</span>] <span style="color:#f92672">*</span> total_hidden_size <span style="color:#f92672">+</span> nblk_idx[<span style="color:#66d9ef">None</span>, :]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 4.2 加载输入数据并 reshape</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        values_tmp1 <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>load(input_gm_ptr <span style="color:#f92672">+</span> idx, mask<span style="color:#f92672">=</span>mask)<span style="color:#f92672">.</span>reshape(qk_head_nums_per_iter_per_vec, HEAD_DIM)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 加载 bias (如果启用)</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> BIAS:
+</span></span><span style="display:flex;"><span>            q_bias_values <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>load(q_bias_ptr <span style="color:#f92672">+</span> tl<span style="color:#f92672">.</span>arange(<span style="color:#ae81ff">0</span>, HEAD_DIM))
+</span></span><span style="display:flex;"><span>            k_bias_values <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>load(k_bias_ptr <span style="color:#f92672">+</span> tl<span style="color:#f92672">.</span>arange(<span style="color:#ae81ff">0</span>, HEAD_DIM))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 4.3 加载 RoPE 的 cos/sin 值</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        values_tmp3 <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>zeros((batch_size_per_iter_per_vec, ROPE_DIM), dtype<span style="color:#f92672">=</span>tl<span style="color:#f92672">.</span>bfloat16)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> tl<span style="color:#f92672">.</span>range(batch_size_per_iter_per_vec):
+</span></span><span style="display:flex;"><span>            pos <span style="color:#f92672">=</span> get_element(x, (i,))
+</span></span><span style="display:flex;"><span>            values_tmp3 <span style="color:#f92672">=</span> insert_slice(
+</span></span><span style="display:flex;"><span>                values_tmp3<span style="color:#f92672">.</span>reshape(batch_size_per_iter_per_vec, ROPE_DIM),
+</span></span><span style="display:flex;"><span>                tl<span style="color:#f92672">.</span>load(pos <span style="color:#f92672">*</span> ROPE_DIM <span style="color:#f92672">+</span> cos_sin_cache_offset[:, <span style="color:#66d9ef">None</span>])<span style="color:#f92672">.</span>reshape(<span style="color:#ae81ff">1</span>, ROPE_DIM),
+</span></span><span style="display:flex;"><span>                offsets<span style="color:#f92672">=</span>(i, <span style="color:#ae81ff">0</span>),
+</span></span><span style="display:flex;"><span>                sizes<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, ROPE_DIM),
+</span></span><span style="display:flex;"><span>                strides<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        values_tmp3 <span style="color:#f92672">=</span> values_tmp3<span style="color:#f92672">.</span>reshape(batch_size_per_iter_per_vec, <span style="color:#ae81ff">1</span>, ROPE_DIM)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 4.4 分离 cos 和 sin</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        cos <span style="color:#f92672">=</span> extract_slice(
+</span></span><span style="display:flex;"><span>            values_tmp3,
+</span></span><span style="display:flex;"><span>            offsets<span style="color:#f92672">=</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>),
+</span></span><span style="display:flex;"><span>            sizes<span style="color:#f92672">=</span>(batch_size_per_iter_per_vec, <span style="color:#ae81ff">1</span>, HALF_ROPE_DIM),
+</span></span><span style="display:flex;"><span>            strides<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>        sin <span style="color:#f92672">=</span> extract_slice(
+</span></span><span style="display:flex;"><span>            values_tmp3,
+</span></span><span style="display:flex;"><span>            offsets<span style="color:#f92672">=</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, HALF_ROPE_DIM),
+</span></span><span style="display:flex;"><span>            sizes<span style="color:#f92672">=</span>(batch_size_per_iter_per_vec, <span style="color:#ae81ff">1</span>, HALF_ROPE_DIM),
+</span></span><span style="display:flex;"><span>            strides<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 4.5 RMSNorm 归一化</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        normalized_values <span style="color:#f92672">=</span> values_tmp1<span style="color:#f92672">.</span>to(tl<span style="color:#f92672">.</span>float32)
+</span></span><span style="display:flex;"><span>        normalized_values <span style="color:#f92672">=</span> normalized_values <span style="color:#f92672">*</span> normalized_values
+</span></span><span style="display:flex;"><span>        normalized_values <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>sum(normalized_values, axis<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>) <span style="color:#f92672">/</span> HEAD_DIM
+</span></span><span style="display:flex;"><span>        normalized_values <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span> <span style="color:#f92672">/</span> tl<span style="color:#f92672">.</span>sqrt(normalized_values <span style="color:#f92672">+</span> eps)<span style="color:#f92672">.</span>reshape(qk_head_nums_per_iter_per_vec, <span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>        normalized_values <span style="color:#f92672">=</span> values_tmp1 <span style="color:#f92672">*</span> normalized_values
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 4.6 Q 的 RMSNorm + Weight + Bias</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        normalized_values_tmp <span style="color:#f92672">=</span> extract_slice(
+</span></span><span style="display:flex;"><span>            normalized_values<span style="color:#f92672">.</span>reshape(batch_size_per_iter_per_vec, qk_head_num_sum, HEAD_DIM),
+</span></span><span style="display:flex;"><span>            offsets<span style="color:#f92672">=</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>),
+</span></span><span style="display:flex;"><span>            sizes<span style="color:#f92672">=</span>(batch_size_per_iter_per_vec, q_head_num, HEAD_DIM),
+</span></span><span style="display:flex;"><span>            strides<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> BIAS:
+</span></span><span style="display:flex;"><span>            normalized_values_tmp <span style="color:#f92672">=</span> (normalized_values_tmp <span style="color:#f92672">*</span> q_weight_values <span style="color:#f92672">+</span> q_bias_values)<span style="color:#f92672">.</span>to(tl<span style="color:#f92672">.</span>bfloat16)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>            normalized_values_tmp <span style="color:#f92672">=</span> (normalized_values_tmp <span style="color:#f92672">*</span> q_weight_values)<span style="color:#f92672">.</span>to(tl<span style="color:#f92672">.</span>bfloat16)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 4.7 Q 的 RoPE 应用</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        values_tmp <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>zeros((batch_size_per_iter_per_vec, q_head_num, ROPE_DIM), dtype<span style="color:#f92672">=</span>tl<span style="color:#f92672">.</span>bfloat16)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        x1 <span style="color:#f92672">=</span> extract_slice(
+</span></span><span style="display:flex;"><span>            normalized_values_tmp,
+</span></span><span style="display:flex;"><span>            offsets<span style="color:#f92672">=</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>),
+</span></span><span style="display:flex;"><span>            sizes<span style="color:#f92672">=</span>(batch_size_per_iter_per_vec, q_head_num, HALF_ROPE_DIM),
+</span></span><span style="display:flex;"><span>            strides<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>        x2 <span style="color:#f92672">=</span> extract_slice(
+</span></span><span style="display:flex;"><span>            normalized_values_tmp,
+</span></span><span style="display:flex;"><span>            offsets<span style="color:#f92672">=</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, HALF_ROPE_DIM),
+</span></span><span style="display:flex;"><span>            sizes<span style="color:#f92672">=</span>(batch_size_per_iter_per_vec, q_head_num, HALF_ROPE_DIM),
+</span></span><span style="display:flex;"><span>            strides<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># RoPE(x1, x2) = [x1*cos - x2*sin, x2*cos + x1*sin]</span>
+</span></span><span style="display:flex;"><span>        values_tmp <span style="color:#f92672">=</span> insert_slice(
+</span></span><span style="display:flex;"><span>            values_tmp,
+</span></span><span style="display:flex;"><span>            x1 <span style="color:#f92672">*</span> cos <span style="color:#f92672">-</span> x2 <span style="color:#f92672">*</span> sin,
+</span></span><span style="display:flex;"><span>            offsets<span style="color:#f92672">=</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>),
+</span></span><span style="display:flex;"><span>            sizes<span style="color:#f92672">=</span>(batch_size_per_iter_per_vec, q_head_num, HALF_ROPE_DIM),
+</span></span><span style="display:flex;"><span>            strides<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>        values_tmp <span style="color:#f92672">=</span> insert_slice(
+</span></span><span style="display:flex;"><span>            values_tmp,
+</span></span><span style="display:flex;"><span>            x2 <span style="color:#f92672">*</span> cos <span style="color:#f92672">+</span> x1 <span style="color:#f92672">*</span> sin,
+</span></span><span style="display:flex;"><span>            offsets<span style="color:#f92672">=</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, HALF_ROPE_DIM),
+</span></span><span style="display:flex;"><span>            sizes<span style="color:#f92672">=</span>(batch_size_per_iter_per_vec, q_head_num, HALF_ROPE_DIM),
+</span></span><span style="display:flex;"><span>            strides<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 4.8 Q 输出写入</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        q_output_idx <span style="color:#f92672">=</span> output_q_nblk_idx[<span style="color:#66d9ef">None</span>, :] <span style="color:#f92672">+</span> (mblk_idx <span style="color:#f92672">+</span> pos_offset)[:, <span style="color:#66d9ef">None</span>] <span style="color:#f92672">*</span> q_hidden_size
+</span></span><span style="display:flex;"><span>        mask <span style="color:#f92672">=</span> (mmask[:, <span style="color:#66d9ef">None</span>]) <span style="color:#f92672">&amp;</span> (output_q_nmask[<span style="color:#66d9ef">None</span>, :])
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> IS_PARTIAL_ROPE:
+</span></span><span style="display:flex;"><span>            normalized_values_tmp <span style="color:#f92672">=</span> insert_slice(
+</span></span><span style="display:flex;"><span>                normalized_values_tmp,
+</span></span><span style="display:flex;"><span>                values_tmp,
+</span></span><span style="display:flex;"><span>                offsets<span style="color:#f92672">=</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>),
+</span></span><span style="display:flex;"><span>                sizes<span style="color:#f92672">=</span>(batch_size_per_iter_per_vec, q_head_num, ROPE_DIM),
+</span></span><span style="display:flex;"><span>                strides<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>            tl<span style="color:#f92672">.</span>store(
+</span></span><span style="display:flex;"><span>                q_gm_ptr <span style="color:#f92672">+</span> q_output_idx,
+</span></span><span style="display:flex;"><span>                normalized_values_tmp<span style="color:#f92672">.</span>reshape(batch_size_per_iter_per_vec, q_hidden_size),
+</span></span><span style="display:flex;"><span>                mask<span style="color:#f92672">=</span>mask,
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>            tl<span style="color:#f92672">.</span>store(
+</span></span><span style="display:flex;"><span>                q_gm_ptr <span style="color:#f92672">+</span> q_output_idx,
+</span></span><span style="display:flex;"><span>                values_tmp<span style="color:#f92672">.</span>reshape(batch_size_per_iter_per_vec, q_hidden_size),
+</span></span><span style="display:flex;"><span>                mask<span style="color:#f92672">=</span>mask,
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 4.9 K 的 RMSNorm + Weight + Bias</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        normalized_values_tmp1 <span style="color:#f92672">=</span> extract_slice(
+</span></span><span style="display:flex;"><span>            normalized_values<span style="color:#f92672">.</span>reshape(batch_size_per_iter_per_vec, qk_head_num_sum, HEAD_DIM),
+</span></span><span style="display:flex;"><span>            offsets<span style="color:#f92672">=</span>(<span style="color:#ae81ff">0</span>, q_head_num, <span style="color:#ae81ff">0</span>),
+</span></span><span style="display:flex;"><span>            sizes<span style="color:#f92672">=</span>(batch_size_per_iter_per_vec, kv_head_num, HEAD_DIM),
+</span></span><span style="display:flex;"><span>            strides<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> BIAS:
+</span></span><span style="display:flex;"><span>            normalized_values_tmp1 <span style="color:#f92672">=</span> (normalized_values_tmp1 <span style="color:#f92672">*</span> k_weight_values <span style="color:#f92672">+</span> k_bias_values)<span style="color:#f92672">.</span>to(tl<span style="color:#f92672">.</span>bfloat16)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>            normalized_values_tmp1 <span style="color:#f92672">=</span> (normalized_values_tmp1 <span style="color:#f92672">*</span> k_weight_values)<span style="color:#f92672">.</span>to(tl<span style="color:#f92672">.</span>bfloat16)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 4.10 K 的 RoPE 应用 (与 Q 相同的旋转公式)</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        values_tmp2 <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>zeros((batch_size_per_iter_per_vec, kv_head_num, ROPE_DIM), dtype<span style="color:#f92672">=</span>tl<span style="color:#f92672">.</span>bfloat16)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        x1 <span style="color:#f92672">=</span> extract_slice(
+</span></span><span style="display:flex;"><span>            normalized_values_tmp1,
+</span></span><span style="display:flex;"><span>            offsets<span style="color:#f92672">=</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>),
+</span></span><span style="display:flex;"><span>            sizes<span style="color:#f92672">=</span>(batch_size_per_iter_per_vec, kv_head_num, HALF_ROPE_DIM),
+</span></span><span style="display:flex;"><span>            strides<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>        x2 <span style="color:#f92672">=</span> extract_slice(
+</span></span><span style="display:flex;"><span>            normalized_values_tmp1,
+</span></span><span style="display:flex;"><span>            offsets<span style="color:#f92672">=</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, HALF_ROPE_DIM),
+</span></span><span style="display:flex;"><span>            sizes<span style="color:#f92672">=</span>(batch_size_per_iter_per_vec, kv_head_num, HALF_ROPE_DIM),
+</span></span><span style="display:flex;"><span>            strides<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        values_tmp2 <span style="color:#f92672">=</span> insert_slice(
+</span></span><span style="display:flex;"><span>            values_tmp2,
+</span></span><span style="display:flex;"><span>            x1 <span style="color:#f92672">*</span> cos <span style="color:#f92672">-</span> x2 <span style="color:#f92672">*</span> sin,
+</span></span><span style="display:flex;"><span>            offsets<span style="color:#f92672">=</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>),
+</span></span><span style="display:flex;"><span>            sizes<span style="color:#f92672">=</span>(batch_size_per_iter_per_vec, kv_head_num, HALF_ROPE_DIM),
+</span></span><span style="display:flex;"><span>            strides<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>        values_tmp2 <span style="color:#f92672">=</span> insert_slice(
+</span></span><span style="display:flex;"><span>            values_tmp2,
+</span></span><span style="display:flex;"><span>            x2 <span style="color:#f92672">*</span> cos <span style="color:#f92672">+</span> x1 <span style="color:#f92672">*</span> sin,
+</span></span><span style="display:flex;"><span>            offsets<span style="color:#f92672">=</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, HALF_ROPE_DIM),
+</span></span><span style="display:flex;"><span>            sizes<span style="color:#f92672">=</span>(batch_size_per_iter_per_vec, kv_head_num, HALF_ROPE_DIM),
+</span></span><span style="display:flex;"><span>            strides<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 4.11 K 输出写入</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># -----------------------------------------------------------------</span>
+</span></span><span style="display:flex;"><span>        kv_output_idx <span style="color:#f92672">=</span> output_kv_nblk_idx[<span style="color:#66d9ef">None</span>, :] <span style="color:#f92672">+</span> (mblk_idx <span style="color:#f92672">+</span> pos_offset)[:, <span style="color:#66d9ef">None</span>] <span style="color:#f92672">*</span> kv_hidden_size
+</span></span><span style="display:flex;"><span>        mask <span style="color:#f92672">=</span> (mmask[:, <span style="color:#66d9ef">None</span>]) <span style="color:#f92672">&amp;</span> (output_kv_nmask[<span style="color:#66d9ef">None</span>, :])
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> IS_PARTIAL_ROPE:
+</span></span><span style="display:flex;"><span>            normalized_values_tmp1 <span style="color:#f92672">=</span> insert_slice(
+</span></span><span style="display:flex;"><span>                normalized_values_tmp1,
+</span></span><span style="display:flex;"><span>                values_tmp2,
+</span></span><span style="display:flex;"><span>                offsets<span style="color:#f92672">=</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>),
+</span></span><span style="display:flex;"><span>                sizes<span style="color:#f92672">=</span>(batch_size_per_iter_per_vec, kv_head_num, ROPE_DIM),
+</span></span><span style="display:flex;"><span>                strides<span style="color:#f92672">=</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>            tl<span style="color:#f92672">.</span>store(
+</span></span><span style="display:flex;"><span>                k_gm_ptr <span style="color:#f92672">+</span> kv_output_idx,
+</span></span><span style="display:flex;"><span>                normalized_values_tmp1<span style="color:#f92672">.</span>reshape(batch_size_per_iter_per_vec, kv_hidden_size),
+</span></span><span style="display:flex;"><span>                mask<span style="color:#f92672">=</span>mask,
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>            tl<span style="color:#f92672">.</span>store(
+</span></span><span style="display:flex;"><span>                k_gm_ptr <span style="color:#f92672">+</span> kv_output_idx,
+</span></span><span style="display:flex;"><span>                values_tmp2<span style="color:#f92672">.</span>reshape(batch_size_per_iter_per_vec, kv_hidden_size),
+</span></span><span style="display:flex;"><span>                mask<span style="color:#f92672">=</span>mask,
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># =========================================================================</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 第五部分：V 的处理 (简单的数据复制，无 RMSNorm 和 RoPE)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># =========================================================================</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># V 部分不需要归一化和 RoPE，直接从输入复制到输出</span>
+</span></span><span style="display:flex;"><span>    mblk_idx <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>arange(<span style="color:#ae81ff">0</span>, v_batch_size_per_iter_per_vec) <span style="color:#f92672">+</span> input_batch_offset
+</span></span><span style="display:flex;"><span>    nblk_idx <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>arange(q_hidden_size <span style="color:#f92672">+</span> kv_hidden_size, total_hidden_size)
+</span></span><span style="display:flex;"><span>    nmask <span style="color:#f92672">=</span> nblk_idx <span style="color:#f92672">&lt;</span> total_hidden_size
+</span></span><span style="display:flex;"><span>    out_nblk_idx <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>arange(<span style="color:#ae81ff">0</span>, kv_hidden_size)
+</span></span><span style="display:flex;"><span>    out_nmask <span style="color:#f92672">=</span> out_nblk_idx <span style="color:#f92672">&lt;</span> kv_hidden_size
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> _ <span style="color:#f92672">in</span> tl<span style="color:#f92672">.</span>range(v_iter_num_per_vec):
+</span></span><span style="display:flex;"><span>        mmask <span style="color:#f92672">=</span> mblk_idx <span style="color:#f92672">&lt;</span> input_batch_offset_end
+</span></span><span style="display:flex;"><span>        mask <span style="color:#f92672">=</span> (mmask[:, <span style="color:#66d9ef">None</span>]) <span style="color:#f92672">&amp;</span> (nmask[<span style="color:#66d9ef">None</span>, :])
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        idx <span style="color:#f92672">=</span> mblk_idx[:, <span style="color:#66d9ef">None</span>] <span style="color:#f92672">*</span> total_hidden_size <span style="color:#f92672">+</span> nblk_idx[<span style="color:#66d9ef">None</span>, :]
+</span></span><span style="display:flex;"><span>        values <span style="color:#f92672">=</span> tl<span style="color:#f92672">.</span>load(input_gm_ptr <span style="color:#f92672">+</span> idx, mask<span style="color:#f92672">=</span>mask)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        out_idx <span style="color:#f92672">=</span> mblk_idx[:, <span style="color:#66d9ef">None</span>] <span style="color:#f92672">*</span> kv_hidden_size <span style="color:#f92672">+</span> out_nblk_idx[<span style="color:#66d9ef">None</span>, :]
+</span></span><span style="display:flex;"><span>        out_mask <span style="color:#f92672">=</span> (mmask[:, <span style="color:#66d9ef">None</span>]) <span style="color:#f92672">&amp;</span> (out_nmask[<span style="color:#66d9ef">None</span>, :])
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        tl<span style="color:#f92672">.</span>store(v_gm_ptr <span style="color:#f92672">+</span> out_idx, values, mask<span style="color:#f92672">=</span>out_mask)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        mblk_idx <span style="color:#f92672">+=</span> v_batch_size_per_iter_per_vec
+</span></span></code></pre></div><p><img src="../../images/2026-05/fusion_operator_flowchart.png" alt=""></p>
+<h3 id="tiling-策略与-ub-容量估算">
+    Tiling 策略与 UB 容量估算<a class="hash-link" href="#tiling-%e7%ad%96%e7%95%a5%e4%b8%8e-ub-%e5%ae%b9%e9%87%8f%e4%bc%b0%e7%ae%97" title="Direct link to heading">#</a>
+</h3><p><strong>Host 端的 UB 容量估算</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>UB_SIZE <span style="color:#f92672">=</span> <span style="color:#ae81ff">87040</span>  <span style="color:#75715e"># 85K = 85 * 1024</span>
+</span></span></code></pre></div><blockquote>
+<p>这里 <code>UB_SIZE</code> 为 <strong>85KB</strong>。Ascend 910A2/A3 的理论 UB 为 192KB，但 Triton 编译器实际可用的 UB 空间受编译器本身开销影响——有效容量通常是理论值的 <strong>50-70%</strong>。85KB 是一个保守且安全的实际可用值。</p>
+</blockquote>
+<p>factor：每个 batch 元素的 <strong>UB 占用</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> IS_PARTIAL_ROPE:
+</span></span><span style="display:flex;"><span>    factor <span style="color:#f92672">=</span> <span style="color:#ae81ff">5</span> <span style="color:#f92672">*</span> q_hidden_size <span style="color:#f92672">+</span> <span style="color:#ae81ff">3</span> <span style="color:#f92672">*</span> kv_hidden_size <span style="color:#f92672">+</span> rope_dim <span style="color:#f92672">*</span> <span style="color:#ae81ff">4</span> <span style="color:#f92672">+</span> q_head_num <span style="color:#f92672">*</span> rope_dim
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>    factor <span style="color:#f92672">=</span> <span style="color:#ae81ff">5</span> <span style="color:#f92672">*</span> q_hidden_size <span style="color:#f92672">+</span> <span style="color:#ae81ff">3</span> <span style="color:#f92672">*</span> kv_hidden_size <span style="color:#f92672">+</span> rope_dim <span style="color:#f92672">*</span> <span style="color:#ae81ff">2</span> <span style="color:#f92672">+</span> q_head_num <span style="color:#f92672">*</span> rope_dim <span style="color:#f92672">//</span> <span style="color:#ae81ff">2</span>
+</span></span></code></pre></div><p>factor 是所有 UB 缓冲区的总元素数估算。以 <code>IS_PARTIAL_ROPE = False, q_hidden_size = 4096, kv_hidden_size = 512, rope_dim = 128, q_head_num = 32</code> 为例：</p>
+<pre tabindex="0"><code>factor = 5 × 4096 + 3 × 512 + 128 × 2 + 32 × 128 / 2
+       = 20480 + 1536 + 256 + 2048
+       = 24320 个元素
+</code></pre><p>基于 factor 可以计算每次迭代的 batch 大小</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>batch_size_per_iter_per_vec <span style="color:#f92672">=</span> int(UB_SIZE <span style="color:#f92672">/</span> input<span style="color:#f92672">.</span>element_size()) <span style="color:#f92672">//</span> factor
+</span></span><span style="display:flex;"><span>batch_size_per_iter_per_vec <span style="color:#f92672">=</span> max(<span style="color:#ae81ff">1</span>, batch_size_per_iter_per_vec)
+</span></span></code></pre></div><p>以 bfloat16（element_size=2）为例：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>batch_size_per_iter <span style="color:#f92672">=</span> floor(<span style="color:#ae81ff">87040</span> <span style="color:#f92672">/</span> <span style="color:#ae81ff">2</span> <span style="color:#f92672">/</span> <span style="color:#ae81ff">24320</span>) <span style="color:#f92672">=</span> floor(<span style="color:#ae81ff">1.79</span>) <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>
+</span></span></code></pre></div><p>即每次核内迭代只能处理 1 个 token。如果 head_dim 更小、hidden_size 更小，一次可以处理更多。</p>
+<p>核间切分：Grid 配置</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>grid <span style="color:#f92672">=</span> (num_vectorcore, <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>)
+</span></span></code></pre></div><p>不含 <code>tl.dot</code>，所以使用 VectorCore 数量而非 AICore 数量。假设 48 个 VectorCore，grid = (48, 1, 1)，每个 VectorCore 处理 <code>batch_size / 48</code> 个 token。</p>
+<blockquote>
+<p>agent-skills 中的 Grid 配置约束：<strong>逐元素 kernel 用 num_vectorcore，矩阵运算 kernel 用 num_aicore</strong>。</p>
+</blockquote>
+<p>缓冲区内存布局分析，在单次 iteration 中，UB 中需要的缓冲区：</p>
+<table>
+  <thead>
+      <tr>
+          <th>缓冲区</th>
+          <th>数据类型</th>
+          <th>形状</th>
+          <th>元素数</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>values_tmp1 (Q+K 输入数据)</td>
+          <td>BF16</td>
+          <td><code>[B, QKV_heads, head_dim]</code></td>
+          <td>B × (QH+KVH) × HD</td>
+      </tr>
+      <tr>
+          <td>normalized_values (RMSNorm 中间)</td>
+          <td>FP32</td>
+          <td><code>[B, QKV_heads, head_dim]</code></td>
+          <td>B × (QH+KVH) × HD</td>
+      </tr>
+      <tr>
+          <td>cos/sin 缓存</td>
+          <td>BF16</td>
+          <td><code>[B, rope_dim]</code></td>
+          <td>B × rope_dim</td>
+      </tr>
+      <tr>
+          <td>Q 输出中间 (weight 后)</td>
+          <td>BF16</td>
+          <td><code>[B, QH, head_dim]</code></td>
+          <td>B × QH × HD</td>
+      </tr>
+      <tr>
+          <td>Q RoPE 结果</td>
+          <td>BF16</td>
+          <td><code>[B, QH, rope_dim]</code></td>
+          <td>B × QH × rope_dim</td>
+      </tr>
+      <tr>
+          <td>K 输出中间 (weight 后)</td>
+          <td>BF16</td>
+          <td><code>[B, KVH, head_dim]</code></td>
+          <td>B × KVH × HD</td>
+      </tr>
+      <tr>
+          <td>K RoPE 结果</td>
+          <td>BF16</td>
+          <td><code>[B, KVH, rope_dim]</code></td>
+          <td>B × KVH × rope_dim</td>
+      </tr>
+  </tbody>
+</table>
+<p>factor 公式正是上述缓冲区元素数的加权求和：</p>
+<pre tabindex="0"><code>5*q_hidden:  Q输入(*1) + Q-Norm中间(FP32*2) + Q-weight后 + Q-RoPE结果 + 数据重叠
+3*kv_hidden: K输入 + K-weight后 + K-RoPE结果
+rope_dim*2:  cos+sin 各 rope_dim 元素
+q_head_num*rope_dim/2: Q RoPE 输出（IS_PARTIAL_ROPE 时需要额外空间保存非 RoPE 部分）
+</code></pre><h3 id="host-端-python-wrapper-与算子注册">
+    Host 端 Python Wrapper 与算子注册<a class="hash-link" href="#host-%e7%ab%af-python-wrapper-%e4%b8%8e%e7%ae%97%e5%ad%90%e6%b3%a8%e5%86%8c" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>direct_register_custom_op(
+</span></span><span style="display:flex;"><span>    op_name<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;qkv_rmsnorm_rope&#34;</span>,
+</span></span><span style="display:flex;"><span>    op_func<span style="color:#f92672">=</span>split_qkv_rmsnorm_rope_impl,
+</span></span><span style="display:flex;"><span>    fake_impl<span style="color:#f92672">=</span>split_qkv_rmsnorm_rope_impl_fake,
+</span></span><span style="display:flex;"><span>    mutates_args<span style="color:#f92672">=</span>[],
+</span></span><span style="display:flex;"><span>    dispatch_key<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;PrivateUse1&#34;</span>,
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><ul>
+<li><code>op_name</code>：注册为 <code>torch.ops.vllm.qkv_rmsnorm_rope</code>，测试代码中通过 <code>torch.ops.vllm.qkv_rmsnorm_rope(...)</code> 调用</li>
+<li><code>dispatch_key=&quot;PrivateUse1&quot;</code>：绑定 NPU 自定义后端，不干扰 GPU 路径</li>
+<li><code>fake_impl</code>：用于 TorchDynamo/AOT 图捕获时的形状推导——返回正确形状的空张量，不需要真实计算</li>
+</ul>
+<h2 id="参考">
+    参考<a class="hash-link" href="#%e5%8f%82%e8%80%83" title="Direct link to heading">#</a>
+</h2><ol>
+<li><a href="https://research.frankk.site/llm-inference-walkthrough">https://research.frankk.site/llm-inference-walkthrough</a></li>
+<li><a href="https://spaces.ac.cn/archives/10907/comment-page-1">https://spaces.ac.cn/archives/10907/comment-page-1</a></li>
+</ol>
+
+    </div>
+  </article>
+</div>
+
+    </main>
+    <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
+      &copy;  Atomage's Blog  2022-2026 
+    </a>
+    <div>
+<div class="ananke-socials">
+  
+    
+    <a href="https://github.com/ZhongsJie" target="_blank" rel="noopener" class="github ananke-social-link link-transition stackoverflow link dib z-999 pt3 pt0-l mr1" title="GitHub link" aria-label="follow on GitHub——Opens in a new window">
+      
+        <span class="icon"><svg style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+</span>
+      
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;"/>
+</svg>
+</span></a>
+  
+</div>
+</div>
+    <a href="https://beian.miit.gov.cn/" class="link db f6 pa2 br3 bg-mid-gray white dim w4 tc"> 蜀ICP备2022025742号 </a>
+    
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
+      <script>
+        var doNotTrack = false;
+        if ( true ) {
+          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
+          var doNotTrack = (dnt == "1" || dnt == "yes");
+        }
+        if (!doNotTrack) {
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-HVT9CMYGB1');
+        }
+      </script>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script>
+renderMathInElement(document.body, {
+    delimiters: [
+        {left: "$$", right: "$$", display: true},
+        {left: "$", right: "$", display: false}
+    ],
+    throwOnError: false
+});
+</script>
+
+  </body>
+</html>

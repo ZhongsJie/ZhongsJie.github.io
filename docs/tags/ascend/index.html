@@ -32,22 +32,22 @@
 
     
     
-      <link href="../../tags/scheudle/index.xml" rel="alternate" type="application/rss+xml" title="Atomage&#39;s Blog" />
-      <link href="../../tags/scheudle/index.xml" rel="feed" type="application/rss+xml" title="Atomage&#39;s Blog" />
+      <link href="../../tags/ascend/index.xml" rel="alternate" type="application/rss+xml" title="Atomage&#39;s Blog" />
+      <link href="../../tags/ascend/index.xml" rel="feed" type="application/rss+xml" title="Atomage&#39;s Blog" />
       
     
     
-    <meta property="og:url" content="http://localhost:1313/tags/scheudle/">
+    <meta property="og:url" content="http://localhost:1313/tags/ascend/">
   <meta property="og:site_name" content="Atomage&#39;s Blog">
-  <meta property="og:title" content="Scheudle">
+  <meta property="og:title" content="Ascend">
   <meta property="og:description" content="分界">
   <meta property="og:locale" content="zh_cn">
   <meta property="og:type" content="website">
 
-  <meta itemprop="name" content="Scheudle">
+  <meta itemprop="name" content="Ascend">
   <meta itemprop="description" content="分界">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Scheudle">
+  <meta name="twitter:title" content="Ascend">
   <meta name="twitter:description" content="分界">
 
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
@@ -117,7 +117,7 @@
 
       <div class="tc-l pv3 ph3 ph4-ns">
         <h1 class="f2 f-subheadline-l fw2 light-silver mb0 lh-title">
-          Scheudle
+          Ascend
         </h1>
         
       </div>
@@ -129,7 +129,7 @@
       
   <article class="cf pa3 pa4-m pa4-l">
     <div class="measure-wide-l center f4 lh-copy nested-copy-line-height nested-links mid-gray">
-      <p>Below you will find pages that utilize the taxonomy term “Scheudle”</p>
+      <p>Below you will find pages that utilize the taxonomy term “Ascend”</p>
     </div>
   </article>
   <div class="mw8 center">
@@ -140,51 +140,26 @@
   <div class="bg-white mb3 pa4 gray overflow-hidden">
     <span class="f6 db">📎Posts</span>
     <h1 class="f3 near-black">
-      <a href="../../posts/2025-12-09-vllm-async-scheduling/" class="link black dim">
-        vllm 异步调度解析
+      <a href="../../posts/2026-05-26-split-qkv-rmsnorm-rope-fusion/" class="link black dim">
+        Split QKV &#43; RMSNorm &#43; RoPE 融合算子
       </a>
     </h1>
     <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
-      <p>在vllm初始版本中只有一个同步调度策略，在该策略下GPU资源会在调度过程中形成空泡，造成GPU资源的浪费。vllm在v0.10.0版本后提供异步调度策略，并且在后续的迭代中不断加入对于其他特性（例如异步场景下的投机解码）的支持。原始PR内容可查看<a href="https://github.com/vllm-project/vllm/pull/19970">#19970 Implement Async Scheduling </a>，当前代码分析基于<code>main branch(735284ed)</code>。</p>
-<p>EngineCore处理处理Step逻辑：</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_process_engine_step</span>(self) <span style="color:#f92672">-&gt;</span> bool:
-</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;&#34;&#34;Called only when there are unfinished local requests.&#34;&#34;&#34;</span>
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Step the engine core.</span>
-</span></span><span style="display:flex;"><span>    outputs, model_executed <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>step_fn()
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Put EngineCoreOutputs into the output queue.</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> output <span style="color:#f92672">in</span> outputs<span style="color:#f92672">.</span>items() <span style="color:#66d9ef">if</span> outputs <span style="color:#66d9ef">else</span> ():
-</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>output_queue<span style="color:#f92672">.</span>put_nowait(output)
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Post-step hook.</span>
-</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>post_step(model_executed)
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> model_executed
-</span></span></code></pre></div><h3 id="同步调度策略">
-    同步调度策略<a class="hash-link" href="#%e5%90%8c%e6%ad%a5%e8%b0%83%e5%ba%a6%e7%ad%96%e7%95%a5" title="Direct link to heading">#</a>
-</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">step</span>(self) <span style="color:#f92672">-&gt;</span> tuple[dict[int, EngineCoreOutputs], bool]:
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> <span style="color:#f92672">not</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>has_requests():
-</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">return</span> {}, <span style="color:#66d9ef">False</span>
-</span></span><span style="display:flex;"><span>  
-</span></span><span style="display:flex;"><span>  scheduler_output <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>schedule()
-</span></span><span style="display:flex;"><span>  <span style="color:#75715e"># 通过FutureWrapper进行异步包装（复用异步调度的部分逻辑， 在同步调度逻辑里面会等待结果返回）</span>
-</span></span><span style="display:flex;"><span>  <span style="color:#75715e"># </span>
-</span></span><span style="display:flex;"><span>  future <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>model_executor<span style="color:#f92672">.</span>execute_model(scheduler_output, non_block<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>)
-</span></span><span style="display:flex;"><span>  <span style="color:#75715e"># 用于支持结构化输出等</span>
-</span></span><span style="display:flex;"><span>  grammar_output <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>get_grammar_bitmask(scheduler_output)
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">with</span> self<span style="color:#f92672">.</span>log_error_detail(scheduler_output):
-</span></span><span style="display:flex;"><span>	  <span style="color:#75715e"># 同步</span>
-</span></span><span style="display:flex;"><span>      model_output <span style="color:#f92672">=</span> future<span style="color:#f92672">.</span>result()
-</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> model_output <span style="color:#f92672">is</span> <span style="color:#66d9ef">None</span>:
-</span></span><span style="display:flex;"><span>          model_output <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>model_executor<span style="color:#f92672">.</span>sample_tokens(grammar_output)
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>  <span style="color:#75715e"># 处理整个过程中abort的请求</span>
-</span></span><span style="display:flex;"><span>  self<span style="color:#f92672">.</span>_process_aborts_queue()
-</span></span><span style="display:flex;"><span>  engine_core_outputs <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>update_from_output(
-</span></span><span style="display:flex;"><span>      scheduler_output, model_output
-</span></span><span style="display:flex;"><span>  )
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> engine_core_outputs, scheduler_output<span style="color:#f92672">.</span>total_num_scheduled_tokens <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>
-</span></span></code></pre></div><p><img src="../../images/2025-12/sync-scheduling.png" alt="sync-scheduling.png">
-同步调度步骤：</p>
+      <blockquote>
+<p><strong>源代码</strong>: <code>vllm-ascend/vllm_ascend/ops/triton/linearnorm/split_qkv_rmsnorm_rope.py</code></p>
+</blockquote>
+<h2 id="背景">
+    背景<a class="hash-link" href="#%e8%83%8c%e6%99%af" title="Direct link to heading">#</a>
+</h2><h3 id="问题内存墙">
+    问题：内存墙<a class="hash-link" href="#%e9%97%ae%e9%a2%98%e5%86%85%e5%ad%98%e5%a2%99" title="Direct link to heading">#</a>
+</h3><p>LLM 推理（尤其是 decode 阶段）是典型的 <strong>memory-bound</strong> 场景。每一次算子调用都是一次「从 Global Memory 搬数据到片上 → 计算 → 搬回 Global Memory」的循环。如果不融合，Split QKV → RMSNorm → RoPE 这三个步骤各自独立执行：</p>
+<pre tabindex="0"><code>非融合流程:
+  hidden_states ──[load]──&gt; Split Q,K,V ──[store]──&gt; q_in, k_in, v_in
+  q_in ──[load]──&gt; RMSNorm ──[store]──&gt; q_normed
+  k_in ──[load]──&gt; RMSNorm ──[store]──&gt; k_normed
+  q_normed ──[load]──&gt; RoPE ──[store]──&gt; q_out
+  k_normed ──[load]──&gt; RoPE ──[store]──&gt; k_out
+</code></pre><p>每一次 <code>load/store</code> 都是一次 GM ↔ UB 的数据搬运。数据在总线上反复进出，但实际的计算量（几个乘加 + 一个开方）极小——这就是 <strong>memory-bandwidth bottleneck</strong>。</p>
     </div>
   </div>
 </div>

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-cn">
-  <head>
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
@@ -21,6 +21,7 @@
 
 
     
+
     
     
       
@@ -36,7 +37,7 @@
       
     
     
-    <meta property="og:url" content="https://blogs.atomage.cn/tags/vllm/">
+    <meta property="og:url" content="http://localhost:1313/tags/vllm/">
   <meta property="og:site_name" content="Atomage&#39;s Blog">
   <meta property="og:title" content="Vllm">
   <meta property="og:description" content="分界">
@@ -45,13 +46,12 @@
 
   <meta itemprop="name" content="Vllm">
   <meta itemprop="description" content="分界">
-  <meta itemprop="datePublished" content="2026-04-28T11:03:49+08:00">
-  <meta itemprop="dateModified" content="2026-04-28T11:03:49+08:00">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Vllm">
   <meta name="twitter:description" content="分界">
 
-	
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+
   </head>
 
   <body class="ma0 avenir bg-near-white">
@@ -134,6 +134,37 @@
   </article>
   <div class="mw8 center">
     <section class="flex-ns flex-wrap justify-around mt5">
+      
+        <div class="relative w-100  mb4 bg-white">
+          <div class="relative w-100 mb4 bg-white nested-copy-line-height">
+  <div class="bg-white mb3 pa4 gray overflow-hidden">
+    <span class="f6 db">📎Posts</span>
+    <h1 class="f3 near-black">
+      <a href="../../posts/2026-05-26-split-qkv-rmsnorm-rope-fusion/" class="link black dim">
+        Split QKV &#43; RMSNorm &#43; RoPE 融合算子
+      </a>
+    </h1>
+    <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
+      <blockquote>
+<p><strong>源代码</strong>: <code>vllm-ascend/vllm_ascend/ops/triton/linearnorm/split_qkv_rmsnorm_rope.py</code></p>
+</blockquote>
+<h2 id="背景">
+    背景<a class="hash-link" href="#%e8%83%8c%e6%99%af" title="Direct link to heading">#</a>
+</h2><h3 id="问题内存墙">
+    问题：内存墙<a class="hash-link" href="#%e9%97%ae%e9%a2%98%e5%86%85%e5%ad%98%e5%a2%99" title="Direct link to heading">#</a>
+</h3><p>LLM 推理（尤其是 decode 阶段）是典型的 <strong>memory-bound</strong> 场景。每一次算子调用都是一次「从 Global Memory 搬数据到片上 → 计算 → 搬回 Global Memory」的循环。如果不融合，Split QKV → RMSNorm → RoPE 这三个步骤各自独立执行：</p>
+<pre tabindex="0"><code>非融合流程:
+  hidden_states ──[load]──&gt; Split Q,K,V ──[store]──&gt; q_in, k_in, v_in
+  q_in ──[load]──&gt; RMSNorm ──[store]──&gt; q_normed
+  k_in ──[load]──&gt; RMSNorm ──[store]──&gt; k_normed
+  q_normed ──[load]──&gt; RoPE ──[store]──&gt; q_out
+  k_normed ──[load]──&gt; RoPE ──[store]──&gt; k_out
+</code></pre><p>每一次 <code>load/store</code> 都是一次 GM ↔ UB 的数据搬运。数据在总线上反复进出，但实际的计算量（几个乘加 + 一个开方）极小——这就是 <strong>memory-bandwidth bottleneck</strong>。</p>
+    </div>
+  </div>
+</div>
+
+        </div>
       
         <div class="relative w-100  mb4 bg-white">
           <div class="relative w-100 mb4 bg-white nested-copy-line-height">
@@ -442,7 +473,7 @@
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
       &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>
@@ -481,6 +512,18 @@
       </script>
   </div>
 </footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script>
+renderMathInElement(document.body, {
+    delimiters: [
+        {left: "$$", right: "$$", display: true},
+        {left: "$", right: "$", display: false}
+    ],
+    throwOnError: false
+});
+</script>
 
   </body>
 </html>

@@ -28,6 +28,19 @@ params:
   favicon: "/images/logo.svg"
   site_logo: "/images/site-logo.svg"
 
+markup:
+  goldmark:
+    extensions:
+      passthrough:
+        delimiters:
+          block:
+            - ['$$', '$$']
+            - ['\[', '\]']
+          inline:
+            - ['$', '$']
+            - ['\(', '\)']
+        enable: true
+
 sitemap:
   changefreq: "monthly"
   filename: "sitemap.xml"

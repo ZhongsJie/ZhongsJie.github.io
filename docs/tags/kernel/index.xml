@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Kernel on Atomage&#39;s Blog</title>
+    <link>http://localhost:1313/tags/kernel/</link>
+    <description>Recent content in Kernel on Atomage&#39;s Blog</description>
+    <generator>Hugo</generator>
+    <language>zh-cn</language>
+    <lastBuildDate>Tue, 26 May 2026 09:50:58 +0800</lastBuildDate>
+    <atom:link href="http://localhost:1313/tags/kernel/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Split QKV &#43; RMSNorm &#43; RoPE 融合算子</title>
+      <link>http://localhost:1313/posts/2026-05-26-split-qkv-rmsnorm-rope-fusion/</link>
+      <pubDate>Tue, 26 May 2026 09:50:58 +0800</pubDate>
+      <guid>http://localhost:1313/posts/2026-05-26-split-qkv-rmsnorm-rope-fusion/</guid>
+      <description>&lt;blockquote&gt;&#xA;&lt;p&gt;&lt;strong&gt;源代码&lt;/strong&gt;: &lt;code&gt;vllm-ascend/vllm_ascend/ops/triton/linearnorm/split_qkv_rmsnorm_rope.py&lt;/code&gt;&lt;/p&gt;&#xA;&lt;/blockquote&gt;&#xA;&lt;h2 id=&#34;背景&#34;&gt;&#xA;    背景&lt;a class=&#34;hash-link&#34; href=&#34;#%e8%83%8c%e6%99%af&#34; title=&#34;Direct link to heading&#34;&gt;#&lt;/a&gt;&#xA;&lt;/h2&gt;&lt;h3 id=&#34;问题内存墙&#34;&gt;&#xA;    问题：内存墙&lt;a class=&#34;hash-link&#34; href=&#34;#%e9%97%ae%e9%a2%98%e5%86%85%e5%ad%98%e5%a2%99&#34; title=&#34;Direct link to heading&#34;&gt;#&lt;/a&gt;&#xA;&lt;/h3&gt;&lt;p&gt;LLM 推理（尤其是 decode 阶段）是典型的 &lt;strong&gt;memory-bound&lt;/strong&gt; 场景。每一次算子调用都是一次「从 Global Memory 搬数据到片上 → 计算 → 搬回 Global Memory」的循环。如果不融合，Split QKV → RMSNorm → RoPE 这三个步骤各自独立执行：&lt;/p&gt;&#xA;&lt;pre tabindex=&#34;0&#34;&gt;&lt;code&gt;非融合流程:&#xA;  hidden_states ──[load]──&amp;gt; Split Q,K,V ──[store]──&amp;gt; q_in, k_in, v_in&#xA;  q_in ──[load]──&amp;gt; RMSNorm ──[store]──&amp;gt; q_normed&#xA;  k_in ──[load]──&amp;gt; RMSNorm ──[store]──&amp;gt; k_normed&#xA;  q_normed ──[load]──&amp;gt; RoPE ──[store]──&amp;gt; q_out&#xA;  k_normed ──[load]──&amp;gt; RoPE ──[store]──&amp;gt; k_out&#xA;&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;每一次 &lt;code&gt;load/store&lt;/code&gt; 都是一次 GM ↔ UB 的数据搬运。数据在总线上反复进出，但实际的计算量（几个乘加 + 一个开方）极小——这就是 &lt;strong&gt;memory-bandwidth bottleneck&lt;/strong&gt;。&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>
