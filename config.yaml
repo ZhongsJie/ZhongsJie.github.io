@@ -5,6 +5,7 @@ theme: 'ananke' # 主题
 disqusShortname: '' # 添加disqusShortname参数，留空表示禁用
 publishDir: "docs"
 relativeURLs: true # 使用相对路径
+enableRobotsTXT: true
 
 enableEmoji: true # 允许使用 Emoji 表情
 

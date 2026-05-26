@@ -57,8 +57,8 @@ cover:
 When ready to publish, run the following commands:
 
 ```bash
-# Build for production
-hugo -e production
+# Build for production (with SEO meta: robots index+follow, sitemap)
+HUGO_ENV=production hugo
 
 # Add and commit changes
 git add -A
