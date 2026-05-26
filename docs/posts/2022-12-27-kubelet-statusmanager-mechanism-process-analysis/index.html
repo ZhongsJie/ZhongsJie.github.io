@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-cn">
-  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
@@ -125,7 +125,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 
     
     
-    <meta property="og:url" content="http://localhost:1313/posts/2022-12-27-kubelet-statusmanager-mechanism-process-analysis/">
+    <meta property="og:url" content="https://blogs.atomage.cn/posts/2022-12-27-kubelet-statusmanager-mechanism-process-analysis/">
   <meta property="og:site_name" content="Atomage&#39;s Blog">
   <meta property="og:title" content="Kubelet StatusManager机制流程分析">
   <meta property="og:description" content="Kubelet StatusManager机制流程分析# 主要功能将Pod状态信息同步到ApiServer，并不会主动监控Pod状态，提供接口供其他Manager调用，当其他组件需要改变 pod 的状态时会将 pod 的 status 信息发送到 statusManager 进行同步。主要使用方probeManager，podWorkers
@@ -151,6 +151,37 @@ type manager struct { kubeClient clientset.Interface podManager kubepod.Manager 
 type manager struct { kubeClient clientset.Interface podManager kubepod.Manager // Map from pod UID to sync status of the corresponding pod. // statusManager 的 cache，保存 pod 与状态的对应关系； podStatuses map[types.UID]versionedPodStatus podStatusesLock sync.RWMutex // 当其他组件调用 statusManager 更新 pod 状态时，会将 pod 的状态信息发送到podStatusesChannel 中； podStatusChannel chan podStatusSyncRequest // Map from (mirror) pod UID to latest status version successfully sent to the API server. // apiStatusVersions must only be accessed from the sync thread. apiStatusVersions map[kubetypes.MirrorPodUID]uint64 // 删除 pod 的接口 podDeletionSafety PodDeletionSafetyProvider podStartupLatencyHelper PodStartupLatencyStateHelper } Start# // 设置定时触发，时间为10s syncTicker := time.NewTicker(syncPeriod).C go wait.Forever(func() { for { select { // 监听到一个pod状态变更的场景 case syncRequest := &lt;-m.podStatusChannel: klog.V(5).InfoS(&#34;Status Manager: syncing pod with status from podStatusChannel&#34;, &#34;podUID&#34;, syncRequest.podUID, &#34;statusVersion&#34;, syncRequest.status.version, &#34;status&#34;, syncRequest.status.status) m.syncPod(syncRequest.podUID, syncRequest.status) -&gt; func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool { // 1. 判断版本号信息 // 2. 获取pod // 3. 判断是否处于删除状态 -&gt; PodResourcesAreReclaimed // 检查 pod 在 node 上占用的所有资源是否已经被回收 } // 触发定时器（定时器，syncPeriod 默认为 10s） case &lt;-syncTicker: klog.V(5).InfoS(&#34;Status Manager: syncing batch&#34;) // remove any entries in the status channel since the batch will handle them for i := len(m.podStatusChannel); i &gt; 0; i-- { &lt;-m.podStatusChannel } m.syncBatch() } } }, 0) syncPod# 基本流程 判断是否需要同步状态， 判断版本号信息是否已经增加，若不需要同步则继续检查 pod 是否处于删除状态 合并状态信息并更新记录到cache 如果可以删除pod，执行删除动作 func (m *manager) syncPod(uid types.UID, status versionedPodStatus) { // 判断是否需要同步状态，以及是否处于删除状态 if !m.needsUpdate(uid, status) { ... } // 判断ResolvedPodUID是否一致，不一致则为删除后重建出来的pod，需要删除statusmanager保存的旧状态信息 if len(translatedUID) &gt; 0 &amp;&amp; translatedUID != kubetypes.ResolvedPodUID(uid) { // 删除保存的状态信息，以及启动延时处理的状态 m.deletePodStatus(uid) return } // 根据实际运行状态以及其他组件设置的状态合并出最终状态信息 mergedStatus := mergePodStatus(pod.Status, status.status, m.podDeletionSafety.PodCouldHaveRunningContainers(pod)) // 更新pod状态信息以及所记录状态 // 如果pod处理删除状态，删除pod以及记录信息 if m.canBeDeleted(pod, status.status) { // 设置GracePeriodSecond为0，同时避免删除一个同名同命名空间的资源，传递Uid做precondition ... err = m.kubeClient.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, deleteOptions) ... m.deletePodStatus(uid) } } syncBatch# 定期将statusManager 缓存 podStatuses 中的数据同步到 apiserver，定时同步的时候会清理channel内容">
 
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<style>
+.toc-sidebar {
+    position: sticky;
+    top: 2rem;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+}
+.toc-sidebar nav ul {
+    list-style: none;
+    padding-left: 0;
+}
+.toc-sidebar nav ul li {
+    margin-bottom: 0.35em;
+    line-height: 1.4;
+}
+.toc-sidebar nav ul li a {
+    color: #555;
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+.toc-sidebar nav ul li a:hover {
+    color: #000;
+}
+.toc-sidebar nav ul ul {
+    padding-left: 0.75em;
+}
+.toc-sidebar nav ul ul li a {
+    font-size: 0.8rem;
+    color: #777;
+}
+</style>
 
   </head>
 
@@ -221,9 +252,9 @@ type manager struct { kubeClient clientset.Interface podManager kubepod.Manager 
 
     <main class="pb7" role="main">
       
-<div class="flex-l mt2 mw8 center">
-  <article class="center cf pv5 ph3 ph4-ns mw7">
-    <header>
+<div class="flex-l mt2 mw9 center">
+  <article class="flex-l flex-wrap justify-between center ph3">
+    <header class="w-100">
       <p class="f6 b helvetica tracked">
         POSTS
       </p>
@@ -231,7 +262,32 @@ type manager struct { kubeClient clientset.Interface podManager kubepod.Manager 
         Kubelet StatusManager机制流程分析
       </h1>
     </header>
-    <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray">
+
+    <aside class="w-20-l mt5-l pr4-l dn db-l toc-sidebar">
+      
+      <div class="nested-list-reset nested-copy-line-height nested-links">
+        <p class="f5 b mb2">目录</p>
+        <nav id="TableOfContents">
+  <ul>
+    <li><a href="#kubelet-statusmanager机制流程分析">Kubelet StatusManager机制流程分析</a></li>
+    <li><a href="#start">Start</a>
+      <ul>
+        <li><a href="#syncpod">syncPod</a></li>
+        <li><a href="#syncbatch">syncBatch</a></li>
+      </ul>
+    </li>
+    <li><a href="#setpodstatus">SetPodStatus</a></li>
+    <li><a href="#setcontainerreadiness">SetContainerReadiness</a></li>
+    <li><a href="#setcontainerstartup">SetContainerStartup</a></li>
+    <li><a href="#terminatepod">TerminatePod</a></li>
+    <li><a href="#updatestatusinternal核心逻辑">updateStatusInternal（核心逻辑）</a></li>
+  </ul>
+</nav>
+      </div>
+      
+    </aside>
+
+    <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray w-80-l">
       <h2 id="kubelet-statusmanager机制流程分析">
     Kubelet StatusManager机制流程分析<a class="hash-link" href="#kubelet-statusmanager%e6%9c%ba%e5%88%b6%e6%b5%81%e7%a8%8b%e5%88%86%e6%9e%90" title="Direct link to heading">#</a>
 </h2><blockquote>
@@ -450,7 +506,7 @@ type manager struct { kubeClient clientset.Interface podManager kubepod.Manager 
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
       &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>

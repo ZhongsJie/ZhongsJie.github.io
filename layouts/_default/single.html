@@ -5,7 +5,7 @@
 
 {{ define "main" }}
 {{ $section := .Site.GetPage "section" .Section }}
-<article class="flex-l flex-wrap justify-between mw8 center ph3">
+<article class="flex-l flex-wrap justify-between mw9 center ph3">
   <header class="mt4 w-100">
     <aside class="instapaper_ignoref b helvetica tracked">
       {{/*
@@ -46,12 +46,20 @@
     <span class="f6 mv4 dib tracked"> - {{ .WordCount}} words</span>
     {{ end }}
   </header>
-  <div class="nested-copy-line-height lh-copy {{ $.Param " post_content_classes" | default "serif" }} f4 nested-links
-    nested-img mid-gray pr4-l w-100-l">
+
+  <aside class="w-20-l mt5-l pr4-l dn db-l toc-sidebar">
+    {{ if .TableOfContents }}
+    <div class="nested-list-reset nested-copy-line-height nested-links">
+      <p class="f5 b mb2">目录</p>
+      {{ .TableOfContents }}
+    </div>
+    {{ end }}
+  </aside>
+
+  <div class="nested-copy-line-height lh-copy {{ $.Param "post_content_classes" | default "serif" }} f4 nested-links nested-img mid-gray w-80-l">
     {{- .Content -}}
     {{- partial "tags.html" . -}}
     <div class="mt6 instapaper_ignoref">
-      {{/* 注释掉Disqus代码以避免错误 */}}
       {{/* if .Site.DisqusShortname */}}
       {{/* template "_internal/disqus.html" . */}}
       {{/* end */}}
@@ -63,10 +71,6 @@
         </script>
     </div>
   </div>
-
-  <aside class="w-30-l mt6-l">
-    {{- partial "menu-contextual.html" . -}}
-  </aside>
 
 </article>
 {{ end }}

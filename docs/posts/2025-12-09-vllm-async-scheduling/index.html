@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-cn">
-  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
@@ -71,7 +71,7 @@ def step(self) -&gt; tuple[dict[int, EngineCoreOutputs], bool]:
 
     
     
-    <meta property="og:url" content="http://localhost:1313/posts/2025-12-09-vllm-async-scheduling/">
+    <meta property="og:url" content="https://blogs.atomage.cn/posts/2025-12-09-vllm-async-scheduling/">
   <meta property="og:site_name" content="Atomage&#39;s Blog">
   <meta property="og:title" content="vllm 异步调度解析">
   <meta property="og:description" content="在vllm初始版本中只有一个同步调度策略，在该策略下GPU资源会在调度过程中形成空泡，造成GPU资源的浪费。vllm在v0.10.0版本后提供异步调度策略，并且在后续的迭代中不断加入对于其他特性（例如异步场景下的投机解码）的支持。原始PR内容可查看#19970 Implement Async Scheduling ，当前代码分析基于main branch(735284ed)。
@@ -101,6 +101,37 @@ EngineCore处理处理Step逻辑：
 def _process_engine_step(self) -&gt; bool: &#34;&#34;&#34;Called only when there are unfinished local requests.&#34;&#34;&#34; # Step the engine core. outputs, model_executed = self.step_fn() # Put EngineCoreOutputs into the output queue. for output in outputs.items() if outputs else (): self.output_queue.put_nowait(output) # Post-step hook. self.post_step(model_executed) return model_executed 同步调度策略# def step(self) -&gt; tuple[dict[int, EngineCoreOutputs], bool]: if not self.scheduler.has_requests(): return {}, False scheduler_output = self.scheduler.schedule() # 通过FutureWrapper进行异步包装（复用异步调度的部分逻辑， 在同步调度逻辑里面会等待结果返回） # future = self.model_executor.execute_model(scheduler_output, non_block=True) # 用于支持结构化输出等 grammar_output = self.scheduler.get_grammar_bitmask(scheduler_output) with self.log_error_detail(scheduler_output): # 同步 model_output = future.result() if model_output is None: model_output = self.model_executor.sample_tokens(grammar_output) # 处理整个过程中abort的请求 self._process_aborts_queue() engine_core_outputs = self.scheduler.update_from_output( scheduler_output, model_output ) return engine_core_outputs, scheduler_output.total_num_scheduled_tokens &gt; 0 同步调度步骤：">
 
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<style>
+.toc-sidebar {
+    position: sticky;
+    top: 2rem;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+}
+.toc-sidebar nav ul {
+    list-style: none;
+    padding-left: 0;
+}
+.toc-sidebar nav ul li {
+    margin-bottom: 0.35em;
+    line-height: 1.4;
+}
+.toc-sidebar nav ul li a {
+    color: #555;
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+.toc-sidebar nav ul li a:hover {
+    color: #000;
+}
+.toc-sidebar nav ul ul {
+    padding-left: 0.75em;
+}
+.toc-sidebar nav ul ul li a {
+    font-size: 0.8rem;
+    color: #777;
+}
+</style>
 
   </head>
 
@@ -171,9 +202,9 @@ def _process_engine_step(self) -&gt; bool: &#34;&#34;&#34;Called only when there
 
     <main class="pb7" role="main">
       
-<div class="flex-l mt2 mw8 center">
-  <article class="center cf pv5 ph3 ph4-ns mw7">
-    <header>
+<div class="flex-l mt2 mw9 center">
+  <article class="flex-l flex-wrap justify-between center ph3">
+    <header class="w-100">
       <p class="f6 b helvetica tracked">
         POSTS
       </p>
@@ -181,7 +212,26 @@ def _process_engine_step(self) -&gt; bool: &#34;&#34;&#34;Called only when there
         vllm 异步调度解析
       </h1>
     </header>
-    <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray">
+
+    <aside class="w-20-l mt5-l pr4-l dn db-l toc-sidebar">
+      
+      <div class="nested-list-reset nested-copy-line-height nested-links">
+        <p class="f5 b mb2">目录</p>
+        <nav id="TableOfContents">
+  <ul>
+    <li>
+      <ul>
+        <li><a href="#同步调度策略">同步调度策略</a></li>
+        <li><a href="#异步调度策略">异步调度策略</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+      </div>
+      
+    </aside>
+
+    <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray w-80-l">
       <p>在vllm初始版本中只有一个同步调度策略，在该策略下GPU资源会在调度过程中形成空泡，造成GPU资源的浪费。vllm在v0.10.0版本后提供异步调度策略，并且在后续的迭代中不断加入对于其他特性（例如异步场景下的投机解码）的支持。原始PR内容可查看<a href="https://github.com/vllm-project/vllm/pull/19970">#19970 Implement Async Scheduling </a>，当前代码分析基于<code>main branch(735284ed)</code>。</p>
 <p>EngineCore处理处理Step逻辑：</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_process_engine_step</span>(self) <span style="color:#f92672">-&gt;</span> bool:
@@ -325,7 +375,7 @@ def _process_engine_step(self) -&gt; bool: &#34;&#34;&#34;Called only when there
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
       &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>

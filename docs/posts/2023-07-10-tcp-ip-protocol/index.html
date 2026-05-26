@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-cn">
-  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
@@ -58,7 +58,7 @@
 
     
     
-    <meta property="og:url" content="http://localhost:1313/posts/2023-07-10-tcp-ip-protocol/">
+    <meta property="og:url" content="https://blogs.atomage.cn/posts/2023-07-10-tcp-ip-protocol/">
   <meta property="og:site_name" content="Atomage&#39;s Blog">
   <meta property="og:title" content="TCP/IP 协议的那些东西">
   <meta property="og:description" content="TCP/IP 协议的那些东西# 本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。
@@ -86,6 +86,37 @@
 应用层 ：为特定应用程序提供数据传输服务，例如 HTTP、DNS 等协议。数据单位为报文。 传输层 ：为进程提供通用数据传输服务。由于应用层协议很多，定义通用的传输层协议就可以支持不断增多的应用层协议。传输层包括两种协议： 传输控制协议 TCP，提供面向连接、可靠的数据传输服务，数据单位为报文段； 用户数据报协议 UDP，提供无连接、尽最大努力的数据传输服务，数据单位为用户数据报。TCP 主要提供完整性服务，UDP 主要提供及时性服务。 网络层 ：为主机提供数据传输服务。而传输层协议是为主机中的进程提供数据传输服务。网络层把传输层传递下来的报文段或者用户数据报封装成分组，IP协议 数据链路层 ：网络层针对的还是主机之间的数据传输服务，而主机之间可以有很多链路，链路层协议就是为同一链路的主机提供数据传输服务。数据链路层把网络层传下来的分组封装成帧。 物理层 ：考虑的是怎样在传输媒体上传输数据比特流，而不是指具体的传输媒体。物理层的作用是尽可能屏蔽传输媒体和通信手段的差异，使数据链路层感觉不到这些差异。 TCP头格式#">
 
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<style>
+.toc-sidebar {
+    position: sticky;
+    top: 2rem;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+}
+.toc-sidebar nav ul {
+    list-style: none;
+    padding-left: 0;
+}
+.toc-sidebar nav ul li {
+    margin-bottom: 0.35em;
+    line-height: 1.4;
+}
+.toc-sidebar nav ul li a {
+    color: #555;
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+.toc-sidebar nav ul li a:hover {
+    color: #000;
+}
+.toc-sidebar nav ul ul {
+    padding-left: 0.75em;
+}
+.toc-sidebar nav ul ul li a {
+    font-size: 0.8rem;
+    color: #777;
+}
+</style>
 
   </head>
 
@@ -156,9 +187,9 @@
 
     <main class="pb7" role="main">
       
-<div class="flex-l mt2 mw8 center">
-  <article class="center cf pv5 ph3 ph4-ns mw7">
-    <header>
+<div class="flex-l mt2 mw9 center">
+  <article class="flex-l flex-wrap justify-between center ph3">
+    <header class="w-100">
       <p class="f6 b helvetica tracked">
         POSTS
       </p>
@@ -166,7 +197,30 @@
         TCP/IP 协议的那些东西
       </h1>
     </header>
-    <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray">
+
+    <aside class="w-20-l mt5-l pr4-l dn db-l toc-sidebar">
+      
+      <div class="nested-list-reset nested-copy-line-height nested-links">
+        <p class="f5 b mb2">目录</p>
+        <nav id="TableOfContents">
+  <ul>
+    <li><a href="#tcpip-协议的那些东西">TCP/IP 协议的那些东西</a>
+      <ul>
+        <li><a href="#概述">概述</a></li>
+        <li><a href="#tcp头格式">TCP头格式</a></li>
+        <li><a href="#tcp的连接和终止">TCP的连接和终止</a></li>
+        <li><a href="#tcp超时重传">TCP超时重传</a></li>
+        <li><a href="#tcp流量控制">TCP流量控制</a></li>
+        <li><a href="#tcp拥塞控制">TCP拥塞控制</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+      </div>
+      
+    </aside>
+
+    <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray w-80-l">
       <h2 id="tcpip-协议的那些东西">
     TCP/IP 协议的那些东西<a class="hash-link" href="#tcpip-%e5%8d%8f%e8%ae%ae%e7%9a%84%e9%82%a3%e4%ba%9b%e4%b8%9c%e8%a5%bf" title="Direct link to heading">#</a>
 </h2><blockquote>
@@ -388,7 +442,7 @@
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
       &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>

@@ -1,8 +1,8 @@
 {{ define "header" }}{{ partial "page-header.html" . }}{{ end }}
 {{ define "main" }}
-<div class="flex-l mt2 mw8 center">
-  <article class="center cf pv5 ph3 ph4-ns mw7">
-    <header>
+<div class="flex-l mt2 mw9 center">
+  <article class="flex-l flex-wrap justify-between center ph3">
+    <header class="w-100">
       <p class="f6 b helvetica tracked">
         {{ humanize .Section | upper }}
       </p>
@@ -10,7 +10,17 @@
         {{ .Title }}
       </h1>
     </header>
-    <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray">
+
+    <aside class="w-20-l mt5-l pr4-l dn db-l toc-sidebar">
+      {{ if .TableOfContents }}
+      <div class="nested-list-reset nested-copy-line-height nested-links">
+        <p class="f5 b mb2">目录</p>
+        {{ .TableOfContents }}
+      </div>
+      {{ end }}
+    </aside>
+
+    <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray w-80-l">
       {{ .Content }}
     </div>
   </article>

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-cn">
-  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
@@ -75,7 +75,7 @@ keepalived主要有三个模块，分别是core、check和vrrp。core模块为ke
 
     
     
-    <meta property="og:url" content="http://localhost:1313/posts/2022-12-09-nginx-learning/">
+    <meta property="og:url" content="https://blogs.atomage.cn/posts/2022-12-09-nginx-learning/">
   <meta property="og:site_name" content="Atomage&#39;s Blog">
   <meta property="og:title" content="Nginx指南">
   <meta property="og:description" content="Nginx 介绍# “Nginx 是一款轻量级的 HTTP 服务器，采用事件驱动的异步非阻塞处理方式框架，这让其具有极好的 IO 性能，时常用于服务端的反向代理和负载均衡。”
@@ -101,6 +101,37 @@ keepalived主要有三个模块，分别是core、check和vrrp。core模块为ke
 正向代理 正向代理“代理”的是客户端，而且客户端是知道目标的，而目标是不知道客户端是通过VPN访问的。 反向代理 反向代理“代理”的是服务器端，而且这一个过程对于客户端而言是透明的。 Nginx的Master-Worker模式# Master 读取并配置nginx.conf, 管理Worker进程 Worker 维护一个线程（避免线程切换），处理连接和请求；注意Worker进程的个数由配置文件决定，一般和CPU个数相关（有利于进程切换），配置几个就有几个Worker进程。 Nginx热部署# 修改配置文件nginx.conf后，重新生成新的worker进程，当然会以新的配置进行处理请求，而且新的请求必须都交给新的worker进程，至于老的worker进程，等把那些以前的请求处理完毕后，kill掉 Keepalived&#43;Nginx实现高可用# Keepalived是一个高可用解决方案，主要是用来防止服务器单点发生故障 keepalived是以VRRP协议为实现基础的，VRRP全称Virtual Router Redundancy Protocol，即虚拟路由冗余协议。 keepalived主要有三个模块，分别是core、check和vrrp。core模块为keepalived的核心，负责主进程的启动、维护以及全局配置文件的加载和解析。check负责健康检查，包括常见的各种检查方式。vrrp模块是来实现VRRP协议的。">
 
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<style>
+.toc-sidebar {
+    position: sticky;
+    top: 2rem;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+}
+.toc-sidebar nav ul {
+    list-style: none;
+    padding-left: 0;
+}
+.toc-sidebar nav ul li {
+    margin-bottom: 0.35em;
+    line-height: 1.4;
+}
+.toc-sidebar nav ul li a {
+    color: #555;
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+.toc-sidebar nav ul li a:hover {
+    color: #000;
+}
+.toc-sidebar nav ul ul {
+    padding-left: 0.75em;
+}
+.toc-sidebar nav ul ul li a {
+    font-size: 0.8rem;
+    color: #777;
+}
+</style>
 
   </head>
 
@@ -171,9 +202,9 @@ keepalived主要有三个模块，分别是core、check和vrrp。core模块为ke
 
     <main class="pb7" role="main">
       
-<div class="flex-l mt2 mw8 center">
-  <article class="center cf pv5 ph3 ph4-ns mw7">
-    <header>
+<div class="flex-l mt2 mw9 center">
+  <article class="flex-l flex-wrap justify-between center ph3">
+    <header class="w-100">
       <p class="f6 b helvetica tracked">
         POSTS
       </p>
@@ -181,7 +212,27 @@ keepalived主要有三个模块，分别是core、check和vrrp。core模块为ke
         Nginx指南
       </h1>
     </header>
-    <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray">
+
+    <aside class="w-20-l mt5-l pr4-l dn db-l toc-sidebar">
+      
+      <div class="nested-list-reset nested-copy-line-height nested-links">
+        <p class="f5 b mb2">目录</p>
+        <nav id="TableOfContents">
+  <ul>
+    <li><a href="#nginx-介绍"><strong>Nginx</strong> 介绍</a>
+      <ul>
+        <li><a href="#nginx的master-worker模式"><strong>Nginx的Master-Worker模式</strong></a></li>
+        <li><a href="#nginx热部署"><strong>Nginx热部署</strong></a></li>
+        <li><a href="#keepalivednginx实现高可用"><strong>Keepalived+Nginx实现高可用</strong></a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+      </div>
+      
+    </aside>
+
+    <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray w-80-l">
       <h2 id="nginx-介绍">
     <strong>Nginx</strong> 介绍<a class="hash-link" href="#nginx-%e4%bb%8b%e7%bb%8d" title="Direct link to heading">#</a>
 </h2><blockquote>
@@ -234,7 +285,7 @@ keepalived主要有三个模块，分别是core、check和vrrp。core模块为ke
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
       &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>

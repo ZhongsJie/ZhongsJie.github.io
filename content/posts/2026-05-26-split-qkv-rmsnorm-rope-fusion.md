@@ -1,7 +1,7 @@
 ---
 title: "Split QKV + RMSNorm + RoPE 融合算子"
 date: 2026-05-26T09:50:58+08:00
-draft: true
+draft: false
 subtitle: ""
 author: "ZhongsJie"
 tags:

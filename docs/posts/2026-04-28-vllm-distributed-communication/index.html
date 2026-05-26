@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-cn">
-  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
@@ -130,7 +130,7 @@ def init_device(self):
 
     
     
-    <meta property="og:url" content="http://localhost:1313/posts/2026-04-28-vllm-distributed-communication/">
+    <meta property="og:url" content="https://blogs.atomage.cn/posts/2026-04-28-vllm-distributed-communication/">
   <meta property="og:site_name" content="Atomage&#39;s Blog">
   <meta property="og:title" content="vLLM 分布式通信">
   <meta property="og:description" content="class WorkerProc: &#34;&#34;&#34;Wrapper that runs one Worker in a separate process.&#34;&#34;&#34; READY_STR = &#34;READY&#34; rpc_broadcast_mq: MessageQueue | None worker_response_mq: MessageQueue | None @instrument(span_name=&#34;Worker init&#34;) def __init__(...): self.rank = rank wrapper = WorkerWrapperBase(rpc_rank=local_rank, global_rank=rank) ... wrapper.init_worker(all_kwargs) self.worker = wrapper ... self.worker.init_device() if envs.VLLM_ELASTIC_EP_SCALE_UP_LAUNCH: self.worker.elastic_ep_execute(&#34;load_model&#34;) else: self.worker.load_model() 。。 Worker init_device# worker的init_device函数负责初始化设备的相关信息
@@ -157,6 +157,37 @@ def init_device(self):
 根据当前worker的rank找到它所属的device，将它绑到指定的卡上，以及清空该device的显存，获取该device的显存大小等 对当前的worker做分布式环境初始化，也就是初始化当前worker的各种进程组（如模型并行、流水线并行、数据并行等） 构造当前worker的GPUModelRunner对象。维护着模型权重分片，还维护模型运行过程中所需要的一些数据结构，比如kv cache等，负责模型权重的加载(load_model)，以及实际的推理执行过程等逻辑。 @instrument(span_name=&#34;Init device&#34;) def init_device(self): if self.device_config.device_type == &#34;cuda&#34;: ... # Ray 会设置 NCCL_ASYNC_ERROR_HANDLING，但这个环境变量会导致 CUDA graph # 构建时出现异常。CUDA graph 需要同步执行，而该变量会引入异步错误处理， # 两者可能引起冲突。 os.environ.pop(&#34;NCCL_ASYNC_ERROR_HANDLING&#34;, None) ... # - Ray/external_launcher 场景：这些分布式执行器自己管理GPU映射 # - 多节点场景(nnodes_within_dp &gt; 1)：每个节点有独立的GPU集合，映射逻辑不同 # - Ray作为DP后端：Ray的resource pool处理GPU分配 if ( parallel_config.distributed_executor_backend not in (&#34;ray&#34;, &#34;external_launcher&#34;) and parallel_config.data_parallel_backend != &#34;ray&#34; and parallel_config.nnodes_within_dp == 1 # 单节点场景 ): # local DP rank 表示在当前节点内的数据并行编号，而 global rank 可能 # 跨节点。在单节点场景下，GPU映射只看节点内的local rank。 dp_local_rank = self.parallel_config.data_parallel_rank_local if dp_local_rank is None: dp_local_rank = self.parallel_config.data_parallel_index # DP副本 0 (dp_local_rank=0) # original_local_rank=0 → GPU 0 &#43; 0×2 = GPU 0 # original_local_rank=0 → GPU 0 &#43; 1×2 = GPU 2 ← 偏移 # 偏移是为了计算出实际的rank信息，后续用来初始化device self.local_rank &#43;= dp_local_rank * tp_pp_world_size 。。 self.device = torch.device(f&#34;cuda:{self.local_rank}&#34;) # PyTorch的设备API演进：从 torch.cuda.set_device() 到 # torch.accelerator.set_device_index()。 后续可以不用再手动指定， torch.accelerator.set_device_index(self.device) ... # 初始化分布式推理所需的所有环境，包括通信组信息 # 优先于内存快照处理逻辑，NCCL在初始化会分配内部缓存区，提前初始化用于保证显存计算的准确性 init_worker_distributed_environment( self.vllm_config, self.rank, self.distributed_init_method, self.local_rank, current_platform.dist_backend, ) # 1. gc.collect() 回收Python层的垃圾对象，释放可能的GPU引用 # 2. empty_cache() 释放PyTorch缓存的显存（包括NCCL缓冲区） # 得到一个&#34;干净&#34;的显存状态，作为基准线 gc.collect() torch.accelerator.empty_cache() # 用于后续计算 KV cache 可用显存。 # init_snapshot 记录当前可用显存，request_memory 根据模型配置 # 计算需要预留的 KV cache 大小。 self.init_snapshot = init_snapshot = MemorySnapshot(device=self.device) self.requested_memory = request_memory(init_snapshot, self.cache_config) # 最后初始化modelrunner，需要依赖设备、分布式通信环境，同时通过快照可以计算出可以分配的kv cache显存大小 if self.use_v2_model_runner: ... self.model_runner: GPUModelRunner = GPUModelRunnerV2( # type: ignore self.vllm_config, self.device ) else: ... self.model_runner = GPUModelRunnerV1(self.vllm_config, self.device) ... init_worker_distributed_environment# 负责初始化分布式推理所需的所有环境组件">
 
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<style>
+.toc-sidebar {
+    position: sticky;
+    top: 2rem;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+}
+.toc-sidebar nav ul {
+    list-style: none;
+    padding-left: 0;
+}
+.toc-sidebar nav ul li {
+    margin-bottom: 0.35em;
+    line-height: 1.4;
+}
+.toc-sidebar nav ul li a {
+    color: #555;
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+.toc-sidebar nav ul li a:hover {
+    color: #000;
+}
+.toc-sidebar nav ul ul {
+    padding-left: 0.75em;
+}
+.toc-sidebar nav ul ul li a {
+    font-size: 0.8rem;
+    color: #777;
+}
+</style>
 
   </head>
 
@@ -227,9 +258,9 @@ def init_device(self):
 
     <main class="pb7" role="main">
       
-<div class="flex-l mt2 mw8 center">
-  <article class="center cf pv5 ph3 ph4-ns mw7">
-    <header>
+<div class="flex-l mt2 mw9 center">
+  <article class="flex-l flex-wrap justify-between center ph3">
+    <header class="w-100">
       <p class="f6 b helvetica tracked">
         POSTS
       </p>
@@ -237,7 +268,41 @@ def init_device(self):
         vLLM 分布式通信
       </h1>
     </header>
-    <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray">
+
+    <aside class="w-20-l mt5-l pr4-l dn db-l toc-sidebar">
+      
+      <div class="nested-list-reset nested-copy-line-height nested-links">
+        <p class="f5 b mb2">目录</p>
+        <nav id="TableOfContents">
+  <ul>
+    <li><a href="#worker-init_device">Worker <code>init_device</code></a></li>
+    <li><a href="#init_worker_distributed_environment"><code>init_worker_distributed_environment</code></a>
+      <ul>
+        <li><a href="#env"><code>env://</code></a></li>
+      </ul>
+    </li>
+    <li><a href="#init_distributed_environment"><code>init_distributed_environment</code></a></li>
+    <li><a href="#groupcoordinator">GroupCoordinator</a>
+      <ul>
+        <li><a href="#集合通信操作">集合通信操作</a></li>
+        <li><a href="#对象通信操作">对象通信操作</a></li>
+        <li><a href="#张量字典通信">张量字典通信</a></li>
+      </ul>
+    </li>
+    <li><a href="#ensure_model_parallel_initialized"><code>ensure_model_parallel_initialized</code></a>
+      <ul>
+        <li><a href="#initialize_model_parallel"><code>initialize_model_parallel</code></a></li>
+      </ul>
+    </li>
+    <li><a href="#init_ascend_model_parallelselfparallel_config"><code>init_ascend_model_parallel(self.parallel_config)</code></a></li>
+    <li><a href="#参考">参考</a></li>
+  </ul>
+</nav>
+      </div>
+      
+    </aside>
+
+    <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray w-80-l">
       <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">WorkerProc</span>:
 </span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;&#34;&#34;Wrapper that runs one Worker in a separate process.&#34;&#34;&#34;</span>
 </span></span><span style="display:flex;"><span>
@@ -838,7 +903,7 @@ ep_group_ranks = [
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
       &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>

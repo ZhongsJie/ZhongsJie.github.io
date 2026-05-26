@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-cn">
-  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
@@ -37,7 +37,7 @@
       
     
     
-    <meta property="og:url" content="http://localhost:1313/categories/">
+    <meta property="og:url" content="https://blogs.atomage.cn/categories/">
   <meta property="og:site_name" content="Atomage&#39;s Blog">
   <meta property="og:title" content="Categories">
   <meta property="og:description" content="分界">
@@ -46,11 +46,44 @@
 
   <meta itemprop="name" content="Categories">
   <meta itemprop="description" content="分界">
+  <meta itemprop="datePublished" content="2025-12-09T11:51:25+08:00">
+  <meta itemprop="dateModified" content="2025-12-09T11:51:25+08:00">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Categories">
   <meta name="twitter:description" content="分界">
 
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<style>
+.toc-sidebar {
+    position: sticky;
+    top: 2rem;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+}
+.toc-sidebar nav ul {
+    list-style: none;
+    padding-left: 0;
+}
+.toc-sidebar nav ul li {
+    margin-bottom: 0.35em;
+    line-height: 1.4;
+}
+.toc-sidebar nav ul li a {
+    color: #555;
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+.toc-sidebar nav ul li a:hover {
+    color: #000;
+}
+.toc-sidebar nav ul ul {
+    padding-left: 0.75em;
+}
+.toc-sidebar nav ul ul li a {
+    font-size: 0.8rem;
+    color: #777;
+}
+</style>
 
   </head>
 
@@ -137,6 +170,67 @@
     <section class="ph4">
       
         <h2 class="f1">
+          <a href="../categories/vllm/" class="link blue hover-black">
+            Category: Vllm
+          </a>
+        </h2>
+        
+          <div class="relative w-100 mb4 bg-white nested-copy-line-height">
+  <div class="bg-white mb3 pa4 gray overflow-hidden">
+    <span class="f6 db">📎Posts</span>
+    <h1 class="f3 near-black">
+      <a href="../posts/2025-12-09-vllm-async-scheduling/" class="link black dim">
+        vllm 异步调度解析
+      </a>
+    </h1>
+    <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
+      <p>在vllm初始版本中只有一个同步调度策略，在该策略下GPU资源会在调度过程中形成空泡，造成GPU资源的浪费。vllm在v0.10.0版本后提供异步调度策略，并且在后续的迭代中不断加入对于其他特性（例如异步场景下的投机解码）的支持。原始PR内容可查看<a href="https://github.com/vllm-project/vllm/pull/19970">#19970 Implement Async Scheduling </a>，当前代码分析基于<code>main branch(735284ed)</code>。</p>
+<p>EngineCore处理处理Step逻辑：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_process_engine_step</span>(self) <span style="color:#f92672">-&gt;</span> bool:
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;&#34;&#34;Called only when there are unfinished local requests.&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Step the engine core.</span>
+</span></span><span style="display:flex;"><span>    outputs, model_executed <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>step_fn()
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Put EngineCoreOutputs into the output queue.</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> output <span style="color:#f92672">in</span> outputs<span style="color:#f92672">.</span>items() <span style="color:#66d9ef">if</span> outputs <span style="color:#66d9ef">else</span> ():
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>output_queue<span style="color:#f92672">.</span>put_nowait(output)
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Post-step hook.</span>
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>post_step(model_executed)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> model_executed
+</span></span></code></pre></div><h3 id="同步调度策略">
+    同步调度策略<a class="hash-link" href="#%e5%90%8c%e6%ad%a5%e8%b0%83%e5%ba%a6%e7%ad%96%e7%95%a5" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">step</span>(self) <span style="color:#f92672">-&gt;</span> tuple[dict[int, EngineCoreOutputs], bool]:
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> <span style="color:#f92672">not</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>has_requests():
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">return</span> {}, <span style="color:#66d9ef">False</span>
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>  scheduler_output <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>schedule()
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e"># 通过FutureWrapper进行异步包装（复用异步调度的部分逻辑， 在同步调度逻辑里面会等待结果返回）</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e"># </span>
+</span></span><span style="display:flex;"><span>  future <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>model_executor<span style="color:#f92672">.</span>execute_model(scheduler_output, non_block<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e"># 用于支持结构化输出等</span>
+</span></span><span style="display:flex;"><span>  grammar_output <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>get_grammar_bitmask(scheduler_output)
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">with</span> self<span style="color:#f92672">.</span>log_error_detail(scheduler_output):
+</span></span><span style="display:flex;"><span>	  <span style="color:#75715e"># 同步</span>
+</span></span><span style="display:flex;"><span>      model_output <span style="color:#f92672">=</span> future<span style="color:#f92672">.</span>result()
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> model_output <span style="color:#f92672">is</span> <span style="color:#66d9ef">None</span>:
+</span></span><span style="display:flex;"><span>          model_output <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>model_executor<span style="color:#f92672">.</span>sample_tokens(grammar_output)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e"># 处理整个过程中abort的请求</span>
+</span></span><span style="display:flex;"><span>  self<span style="color:#f92672">.</span>_process_aborts_queue()
+</span></span><span style="display:flex;"><span>  engine_core_outputs <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>update_from_output(
+</span></span><span style="display:flex;"><span>      scheduler_output, model_output
+</span></span><span style="display:flex;"><span>  )
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> engine_core_outputs, scheduler_output<span style="color:#f92672">.</span>total_num_scheduled_tokens <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>
+</span></span></code></pre></div><p><img src="../images/2025-12/sync-scheduling.png" alt="sync-scheduling.png">
+同步调度步骤：</p>
+    </div>
+  </div>
+</div>
+
+        
+      
+        <h2 class="f1">
           <a href="../categories/go/" class="link blue hover-black">
             Category: Go
           </a>
@@ -189,6 +283,54 @@
     Go内存模型<a class="hash-link" href="#go%e5%86%85%e5%ad%98%e6%a8%a1%e5%9e%8b" title="Direct link to heading">#</a>
 </h2><blockquote>
 <p>参考<a href="https://github.com/google/tcmalloc/blob/master/docs/design.md">tcmalloc</a>设计，「修改由多个goroutine同时访问的数据的程序必须序列化这种访问。 要序列化访问，请使用channel操作或其他同步原语（sync和sync/atomic）保护数据。 别自作聪明。」</p>
+    </div>
+  </div>
+</div>
+
+        
+      
+        <h2 class="f1">
+          <a href="../categories/network/" class="link blue hover-black">
+            Category: Network
+          </a>
+        </h2>
+        
+          <div class="relative w-100 mb4 bg-white nested-copy-line-height">
+  <div class="bg-white mb3 pa4 gray overflow-hidden">
+    <span class="f6 db">📎Posts</span>
+    <h1 class="f3 near-black">
+      <a href="../posts/2023-07-10-tcp-ip-protocol/" class="link black dim">
+        TCP/IP 协议的那些东西
+      </a>
+    </h1>
+    <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
+      <h2 id="tcpip-协议的那些东西">
+    TCP/IP 协议的那些东西<a class="hash-link" href="#tcpip-%e5%8d%8f%e8%ae%ae%e7%9a%84%e9%82%a3%e4%ba%9b%e4%b8%9c%e8%a5%bf" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。</p>
+</blockquote>
+<h3 id="概述">
+    概述<a class="hash-link" href="#%e6%a6%82%e8%bf%b0" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理</p>
+</blockquote>
+<p><img src="../images/2023-07/image-OSI-model.png" alt="OSI Model"></p>
+<ul>
+<li><strong>应用层</strong> ：为特定应用程序提供数据传输服务，例如 HTTP、DNS 等协议。数据单位为报文。</li>
+<li><strong>传输层</strong> ：为进程提供通用数据传输服务。由于应用层协议很多，定义通用的传输层协议就可以支持不断增多的应用层协议。传输层包括两种协议：
+<ul>
+<li><strong>传输控制协议 TCP</strong>，提供面向<strong>连接、可靠</strong>的数据传输服务，数据单位为报文段；</li>
+<li><strong>用户数据报协议 UDP</strong>，提供无连接、尽最大努力的数据传输服务，数据单位为用户数据报。TCP 主要提供完整性服务，UDP 主要<strong>提供及时性服务</strong>。</li>
+</ul>
+</li>
+<li><strong>网络层</strong> ：为主机提供数据传输服务。而传输层协议是为主机中的进程提供数据传输服务。网络层把传输层传递下来的报文段或者用户数据报封装成分组，<strong>IP协议</strong></li>
+<li><strong>数据链路层</strong> ：网络层针对的还是主机之间的数据传输服务，而主机之间可以有很多链路，链路层协议就是为同一链路的主机提供数据传输服务。数据链路层把网络层传下来的分组<strong>封装成帧</strong>。</li>
+<li><strong>物理层</strong> ：考虑的是怎样在传输媒体上传输数据比特流，而不是指具体的传输媒体。物理层的作用是尽可能屏蔽传输媒体和通信手段的差异，使数据链路层感觉不到这些差异。</li>
+</ul>
+<hr>
+<h3 id="tcp头格式">
+    TCP头格式<a class="hash-link" href="#tcp%e5%a4%b4%e6%a0%bc%e5%bc%8f" title="Direct link to heading">#</a>
+</h3><p><img src="../images/2023-07/image-TCP-Header.jpg" alt="TCP Header"></p>
     </div>
   </div>
 </div>
@@ -346,122 +488,13 @@
 
         
       
-        <h2 class="f1">
-          <a href="../categories/network/" class="link blue hover-black">
-            Category: Network
-          </a>
-        </h2>
-        
-          <div class="relative w-100 mb4 bg-white nested-copy-line-height">
-  <div class="bg-white mb3 pa4 gray overflow-hidden">
-    <span class="f6 db">📎Posts</span>
-    <h1 class="f3 near-black">
-      <a href="../posts/2023-07-10-tcp-ip-protocol/" class="link black dim">
-        TCP/IP 协议的那些东西
-      </a>
-    </h1>
-    <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
-      <h2 id="tcpip-协议的那些东西">
-    TCP/IP 协议的那些东西<a class="hash-link" href="#tcpip-%e5%8d%8f%e8%ae%ae%e7%9a%84%e9%82%a3%e4%ba%9b%e4%b8%9c%e8%a5%bf" title="Direct link to heading">#</a>
-</h2><blockquote>
-<p>本文主要是基于《TCP/IP 详解 卷1：协议》以及一些资料的一个学习总结。</p>
-</blockquote>
-<h3 id="概述">
-    概述<a class="hash-link" href="#%e6%a6%82%e8%bf%b0" title="Direct link to heading">#</a>
-</h3><blockquote>
-<p>网络中的整体传输流程可以简要总结为：数据首先会封装到TCP的Segment中，然后TCP的Segment封装到IP的Packet中，最后封装为以太网Ethernet的Frame，各个层解析自己的协议以及数据信息，最后将数据交给更高层的协议处理</p>
-</blockquote>
-<p><img src="../images/2023-07/image-OSI-model.png" alt="OSI Model"></p>
-<ul>
-<li><strong>应用层</strong> ：为特定应用程序提供数据传输服务，例如 HTTP、DNS 等协议。数据单位为报文。</li>
-<li><strong>传输层</strong> ：为进程提供通用数据传输服务。由于应用层协议很多，定义通用的传输层协议就可以支持不断增多的应用层协议。传输层包括两种协议：
-<ul>
-<li><strong>传输控制协议 TCP</strong>，提供面向<strong>连接、可靠</strong>的数据传输服务，数据单位为报文段；</li>
-<li><strong>用户数据报协议 UDP</strong>，提供无连接、尽最大努力的数据传输服务，数据单位为用户数据报。TCP 主要提供完整性服务，UDP 主要<strong>提供及时性服务</strong>。</li>
-</ul>
-</li>
-<li><strong>网络层</strong> ：为主机提供数据传输服务。而传输层协议是为主机中的进程提供数据传输服务。网络层把传输层传递下来的报文段或者用户数据报封装成分组，<strong>IP协议</strong></li>
-<li><strong>数据链路层</strong> ：网络层针对的还是主机之间的数据传输服务，而主机之间可以有很多链路，链路层协议就是为同一链路的主机提供数据传输服务。数据链路层把网络层传下来的分组<strong>封装成帧</strong>。</li>
-<li><strong>物理层</strong> ：考虑的是怎样在传输媒体上传输数据比特流，而不是指具体的传输媒体。物理层的作用是尽可能屏蔽传输媒体和通信手段的差异，使数据链路层感觉不到这些差异。</li>
-</ul>
-<hr>
-<h3 id="tcp头格式">
-    TCP头格式<a class="hash-link" href="#tcp%e5%a4%b4%e6%a0%bc%e5%bc%8f" title="Direct link to heading">#</a>
-</h3><p><img src="../images/2023-07/image-TCP-Header.jpg" alt="TCP Header"></p>
-    </div>
-  </div>
-</div>
-
-        
-      
-        <h2 class="f1">
-          <a href="../categories/vllm/" class="link blue hover-black">
-            Category: Vllm
-          </a>
-        </h2>
-        
-          <div class="relative w-100 mb4 bg-white nested-copy-line-height">
-  <div class="bg-white mb3 pa4 gray overflow-hidden">
-    <span class="f6 db">📎Posts</span>
-    <h1 class="f3 near-black">
-      <a href="../posts/2025-12-09-vllm-async-scheduling/" class="link black dim">
-        vllm 异步调度解析
-      </a>
-    </h1>
-    <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
-      <p>在vllm初始版本中只有一个同步调度策略，在该策略下GPU资源会在调度过程中形成空泡，造成GPU资源的浪费。vllm在v0.10.0版本后提供异步调度策略，并且在后续的迭代中不断加入对于其他特性（例如异步场景下的投机解码）的支持。原始PR内容可查看<a href="https://github.com/vllm-project/vllm/pull/19970">#19970 Implement Async Scheduling </a>，当前代码分析基于<code>main branch(735284ed)</code>。</p>
-<p>EngineCore处理处理Step逻辑：</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_process_engine_step</span>(self) <span style="color:#f92672">-&gt;</span> bool:
-</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;&#34;&#34;Called only when there are unfinished local requests.&#34;&#34;&#34;</span>
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Step the engine core.</span>
-</span></span><span style="display:flex;"><span>    outputs, model_executed <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>step_fn()
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Put EngineCoreOutputs into the output queue.</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> output <span style="color:#f92672">in</span> outputs<span style="color:#f92672">.</span>items() <span style="color:#66d9ef">if</span> outputs <span style="color:#66d9ef">else</span> ():
-</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>output_queue<span style="color:#f92672">.</span>put_nowait(output)
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Post-step hook.</span>
-</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>post_step(model_executed)
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> model_executed
-</span></span></code></pre></div><h3 id="同步调度策略">
-    同步调度策略<a class="hash-link" href="#%e5%90%8c%e6%ad%a5%e8%b0%83%e5%ba%a6%e7%ad%96%e7%95%a5" title="Direct link to heading">#</a>
-</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">step</span>(self) <span style="color:#f92672">-&gt;</span> tuple[dict[int, EngineCoreOutputs], bool]:
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> <span style="color:#f92672">not</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>has_requests():
-</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">return</span> {}, <span style="color:#66d9ef">False</span>
-</span></span><span style="display:flex;"><span>  
-</span></span><span style="display:flex;"><span>  scheduler_output <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>schedule()
-</span></span><span style="display:flex;"><span>  <span style="color:#75715e"># 通过FutureWrapper进行异步包装（复用异步调度的部分逻辑， 在同步调度逻辑里面会等待结果返回）</span>
-</span></span><span style="display:flex;"><span>  <span style="color:#75715e"># </span>
-</span></span><span style="display:flex;"><span>  future <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>model_executor<span style="color:#f92672">.</span>execute_model(scheduler_output, non_block<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>)
-</span></span><span style="display:flex;"><span>  <span style="color:#75715e"># 用于支持结构化输出等</span>
-</span></span><span style="display:flex;"><span>  grammar_output <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>get_grammar_bitmask(scheduler_output)
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">with</span> self<span style="color:#f92672">.</span>log_error_detail(scheduler_output):
-</span></span><span style="display:flex;"><span>	  <span style="color:#75715e"># 同步</span>
-</span></span><span style="display:flex;"><span>      model_output <span style="color:#f92672">=</span> future<span style="color:#f92672">.</span>result()
-</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> model_output <span style="color:#f92672">is</span> <span style="color:#66d9ef">None</span>:
-</span></span><span style="display:flex;"><span>          model_output <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>model_executor<span style="color:#f92672">.</span>sample_tokens(grammar_output)
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>  <span style="color:#75715e"># 处理整个过程中abort的请求</span>
-</span></span><span style="display:flex;"><span>  self<span style="color:#f92672">.</span>_process_aborts_queue()
-</span></span><span style="display:flex;"><span>  engine_core_outputs <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>update_from_output(
-</span></span><span style="display:flex;"><span>      scheduler_output, model_output
-</span></span><span style="display:flex;"><span>  )
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> engine_core_outputs, scheduler_output<span style="color:#f92672">.</span>total_num_scheduled_tokens <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>
-</span></span></code></pre></div><p><img src="../images/2025-12/sync-scheduling.png" alt="sync-scheduling.png">
-同步调度步骤：</p>
-    </div>
-  </div>
-</div>
-
-        
-      
     </section>
   </div>
 
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
       &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>
