@@ -6,8 +6,29 @@
     <description>Recent content in Tags on Atomage&#39;s Blog</description>
     <generator>Hugo</generator>
     <language>zh-cn</language>
-    <lastBuildDate>Tue, 26 May 2026 09:50:58 +0800</lastBuildDate>
+    <lastBuildDate>Mon, 08 Jun 2026 23:39:17 +0800</lastBuildDate>
     <atom:link href="https://blogs.atomage.cn/tags/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Attention</title>
+      <link>https://blogs.atomage.cn/tags/attention/</link>
+      <pubDate>Mon, 08 Jun 2026 23:39:17 +0800</pubDate>
+      <guid>https://blogs.atomage.cn/tags/attention/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Deepseek</title>
+      <link>https://blogs.atomage.cn/tags/deepseek/</link>
+      <pubDate>Mon, 08 Jun 2026 23:39:17 +0800</pubDate>
+      <guid>https://blogs.atomage.cn/tags/deepseek/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Inference</title>
+      <link>https://blogs.atomage.cn/tags/inference/</link>
+      <pubDate>Mon, 08 Jun 2026 23:39:17 +0800</pubDate>
+      <guid>https://blogs.atomage.cn/tags/inference/</guid>
+      <description></description>
+    </item>
     <item>
       <title>Ai</title>
       <link>https://blogs.atomage.cn/tags/ai/</link>
@@ -20,13 +41,6 @@
       <link>https://blogs.atomage.cn/tags/ascend/</link>
       <pubDate>Tue, 26 May 2026 09:50:58 +0800</pubDate>
       <guid>https://blogs.atomage.cn/tags/ascend/</guid>
-      <description></description>
-    </item>
-    <item>
-      <title>Inference</title>
-      <link>https://blogs.atomage.cn/tags/inference/</link>
-      <pubDate>Tue, 26 May 2026 09:50:58 +0800</pubDate>
-      <guid>https://blogs.atomage.cn/tags/inference/</guid>
       <description></description>
     </item>
     <item>

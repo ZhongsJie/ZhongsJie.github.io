@@ -195,6 +195,12 @@ pre code {
       <ul class="archive-list">
         
         <li>
+          2026-06-08
+          ->
+          <a href="../posts/2026-06-08-mla-attention/">MLA(Multi-Head Latent Attention)</a>
+        </li>
+        
+        <li>
           2026-05-26
           ->
           <a href="../posts/2026-05-26-split-qkv-rmsnorm-rope-fusion/">Split QKV &#43; RMSNorm &#43; RoPE 融合算子</a>
@@ -340,7 +346,9 @@ pre code {
 renderMathInElement(document.body, {
     delimiters: [
         {left: "$$", right: "$$", display: true},
-        {left: "$", right: "$", display: false}
+        {left: "\\[", right: "\\]", display: true},
+        {left: "$", right: "$", display: false},
+        {left: "\\(", right: "\\)", display: false}
     ],
     throwOnError: false
 });

@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    
+    <title>MLA(Multi-Head Latent Attention) | Atomage&#39;s Blog</title>
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="description" content="
+
+    MHA（多头注意力）#
+$$Attention(Q, K, V) = softmax(Q·K^T / \sqrt{d_h}) · V$$
+
+$$q_t = W^Q h_t$$
+
+$$k_t = W^K h_t$$
+
+$$v_t = W^V h_t$$
+$d$: Embedding维度；
+$d_h$：每一个头的维度；
+$n_h$: Attention头数；
+$h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入；
+$W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ；
+$q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ；
+$$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$
+$$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$
+$$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$
+$$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$
+$$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$
+$q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头；
+$W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵；
+每个 token 单层需要缓存的 cache 的是 $n_h$ 套 ($k,v$) — 共 $2n_hd_h$
+
+
+    MQA（多查询注意力）#
+
+所有 $n_h$ 个 Q head 共享同一套 K、V，只剩 1 套，更快的推理速度：由于内存和缓存需求大幅下降，内存带宽开销也基本消除。虽然训练效率基本保持不变，但与 MHA 相比，共享 K/V 对可能会导致模型质量和输出精度略有下降">
+    <meta name="generator" content="Hugo 0.154.5">
+    
+    
+    
+    
+      <meta name="robots" content="index, follow">
+    
+
+    
+<link rel="stylesheet" href="../../ananke/css/main.min.65a4ba9d742b05c115846d8e06cf4714294b7ebf3dd26b492a84a9e3cc66923d.css" >
+
+
+
+    
+
+    
+    
+      
+<link rel="shortcut icon" href="../../images/logo.svg" type="image/x-icon" />
+
+
+    
+
+    
+    
+    <meta property="og:url" content="https://blogs.atomage.cn/posts/2026-06-08-mla-attention/">
+  <meta property="og:site_name" content="Atomage&#39;s Blog">
+  <meta property="og:title" content="MLA(Multi-Head Latent Attention)">
+  <meta property="og:description" content="MHA（多头注意力）# $$Attention(Q, K, V) = softmax(Q·K^T / \sqrt{d_h}) · V$$ $$q_t = W^Q h_t$$ $$k_t = W^K h_t$$ $$v_t = W^V h_t$$ $d$: Embedding维度； $d_h$：每一个头的维度； $n_h$: Attention头数； $h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入； $W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ； $q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ； $$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$ $$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$ $$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$ $$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$ $q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头； $W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵； 每个 token 单层需要缓存的 cache 的是 $n_h$ 套 ($k,v$) — 共 $2n_hd_h$ MQA（多查询注意力）# 所有 $n_h$ 个 Q head 共享同一套 K、V，只剩 1 套，更快的推理速度：由于内存和缓存需求大幅下降，内存带宽开销也基本消除。虽然训练效率基本保持不变，但与 MHA 相比，共享 K/V 对可能会导致模型质量和输出精度略有下降">
+  <meta property="og:locale" content="zh_cn">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2026-06-08T23:39:17+08:00">
+    <meta property="article:modified_time" content="2026-06-08T23:39:17+08:00">
+    <meta property="article:tag" content="Deepseek">
+    <meta property="article:tag" content="Inference">
+    <meta property="article:tag" content="Attention">
+
+  <meta itemprop="name" content="MLA(Multi-Head Latent Attention)">
+  <meta itemprop="description" content="MHA（多头注意力）# $$Attention(Q, K, V) = softmax(Q·K^T / \sqrt{d_h}) · V$$ $$q_t = W^Q h_t$$ $$k_t = W^K h_t$$ $$v_t = W^V h_t$$ $d$: Embedding维度； $d_h$：每一个头的维度； $n_h$: Attention头数； $h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入； $W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ； $q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ； $$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$ $$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$ $$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$ $$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$ $q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头； $W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵； 每个 token 单层需要缓存的 cache 的是 $n_h$ 套 ($k,v$) — 共 $2n_hd_h$ MQA（多查询注意力）# 所有 $n_h$ 个 Q head 共享同一套 K、V，只剩 1 套，更快的推理速度：由于内存和缓存需求大幅下降，内存带宽开销也基本消除。虽然训练效率基本保持不变，但与 MHA 相比，共享 K/V 对可能会导致模型质量和输出精度略有下降">
+  <meta itemprop="datePublished" content="2026-06-08T23:39:17+08:00">
+  <meta itemprop="dateModified" content="2026-06-08T23:39:17+08:00">
+  <meta itemprop="wordCount" content="7277">
+  <meta itemprop="keywords" content="Deepseek,Inference,Attention">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="MLA(Multi-Head Latent Attention)">
+  <meta name="twitter:description" content="MHA（多头注意力）# $$Attention(Q, K, V) = softmax(Q·K^T / \sqrt{d_h}) · V$$ $$q_t = W^Q h_t$$ $$k_t = W^K h_t$$ $$v_t = W^V h_t$$ $d$: Embedding维度； $d_h$：每一个头的维度； $n_h$: Attention头数； $h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入； $W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ； $q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ； $$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$ $$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$ $$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$ $$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$ $q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头； $W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵； 每个 token 单层需要缓存的 cache 的是 $n_h$ 套 ($k,v$) — 共 $2n_hd_h$ MQA（多查询注意力）# 所有 $n_h$ 个 Q head 共享同一套 K、V，只剩 1 套，更快的推理速度：由于内存和缓存需求大幅下降，内存带宽开销也基本消除。虽然训练效率基本保持不变，但与 MHA 相比，共享 K/V 对可能会导致模型质量和输出精度略有下降">
+
+      
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
+      <script>
+        var doNotTrack = false;
+        if ( true ) {
+          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
+          var doNotTrack = (dnt == "1" || dnt == "yes");
+        }
+        if (!doNotTrack) {
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-HVT9CMYGB1');
+        }
+      </script>
+    
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<style>
+.toc-sidebar {
+    position: sticky;
+    top: 2rem;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+}
+.toc-sidebar nav ul {
+    list-style: none;
+    padding-left: 0;
+}
+.toc-sidebar nav ul li {
+    margin-bottom: 0.35em;
+    line-height: 1.4;
+}
+.toc-sidebar nav ul li a {
+    color: #555;
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+.toc-sidebar nav ul li a:hover {
+    color: #000;
+}
+.toc-sidebar nav ul ul {
+    padding-left: 0.75em;
+}
+.toc-sidebar nav ul ul li a {
+    font-size: 0.8rem;
+    color: #777;
+}
+pre {
+    max-width: 100%;
+    box-sizing: border-box;
+    border-radius: 6px;
+}
+pre code {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+</style>
+
+  </head>
+
+  <body class="ma0 avenir bg-near-white production">
+
+    
+
+  <header>
+    <div class="bg-black">
+      <nav class="pv3 ph3 ph4-ns" role="navigation">
+  <div class="flex-l justify-between items-center center">
+    <a href="../../" class="f3 fw2 hover-white no-underline white-90 dib">
+      
+        <img src="../../images/site-logo.svg" class="w100 mw5-ns" alt="Atomage&#39;s Blog" />
+      
+    </a>
+    <div class="flex-l items-center">
+      
+
+      
+        <ul class="pl0 mr3">
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="../../archives/" title="⏱️Archives page">
+              ⏱️Archives
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="../../posts/" title="📎Posts page">
+              📎Posts
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="../../about/" title="🙋🏻‍♂️About page">
+              🙋🏻‍♂️About
+            </a>
+          </li>
+          
+        </ul>
+      
+      
+<div class="ananke-socials">
+  
+    
+    <a href="https://github.com/ZhongsJie" target="_blank" rel="noopener" class="github ananke-social-link link-transition stackoverflow link dib z-999 pt3 pt0-l mr1" title="GitHub link" aria-label="follow on GitHub——Opens in a new window">
+      
+        <span class="icon"><svg style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+</span>
+      
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;"/>
+</svg>
+</span></a>
+  
+</div>
+
+    </div>
+  </div>
+</nav>
+
+    </div>
+  </header>
+
+
+    <main class="pb7" role="main">
+      
+
+<div class="flex-l mt2 mw9 center">
+  <article class="flex-l justify-between center ph3">
+    <aside class="w-20-l pr4-l dn db-l toc-sidebar">
+      
+      <div class="nested-list-reset nested-copy-line-height nested-links">
+        <p class="f5 b mb2 mt0">目录</p>
+        <nav id="TableOfContents">
+  <ul>
+    <li><a href="#mha多头注意力">MHA（多头注意力）</a></li>
+    <li><a href="#mqa多查询注意力">MQA（多查询注意力）</a></li>
+    <li><a href="#gqa分组注意力">GQA（分组注意力）</a></li>
+    <li><a href="#mla多头潜在注意力">MLA（多头潜在注意力）</a>
+      <ul>
+        <li><a href="#低秩-kv-联合压缩">低秩 KV 联合压缩</a></li>
+        <li><a href="#解耦rope">解耦RoPE</a></li>
+        <li><a href="#mla完整计算推导">MLA完整计算推导</a></li>
+        <li><a href="#mla-mode">MLA Mode</a></li>
+      </ul>
+    </li>
+    <li><a href="#attention-对比参数量--kv-cache">Attention 对比：参数量 / KV cache</a>
+      <ul>
+        <li><a href="#参数量对比单层">参数量对比（单层）</a></li>
+        <li><a href="#kv-cache对比">KV cache对比</a></li>
+      </ul>
+    </li>
+    <li><a href="#mla-vllm框架代码实现">MLA vllm框架代码实现</a>
+      <ul>
+        <li><a href="#配置读取">配置读取</a></li>
+        <li><a href="#deepseekv2mlaattention初始化">DeepseekV2MLAAttention初始化</a></li>
+        <li><a href="#mla-wrapper前处理">MLA Wrapper前处理</a></li>
+        <li><a href="#mlaattention-初始化确定-cache-entry-形态和-backend">MLAAttention 初始化：确定 cache entry 形态和 backend</a></li>
+        <li><a href="#forward过程先更新kv-cache再计算attention">Forward过程：先更新KV cache，再计算attention</a></li>
+        <li><a href="#forward_impl把-batch-拆成-prefill-和-decode">forward_impl：把 batch 拆成 prefill 和 decode</a></li>
+        <li><a href="#prefill-mha当前-token-与历史-context-分开算">Prefill MHA：当前 token 与历史 context 分开算</a></li>
+        <li><a href="#decode-mqa直接在-latent-cache-上算">Decode MQA：直接在 latent cache 上算</a></li>
+        <li><a href="#kv-cache">KV cache</a></li>
+      </ul>
+    </li>
+    <li><a href="#参考">参考</a></li>
+  </ul>
+</nav>
+      </div>
+      
+    </aside>
+
+    <div class="w-80-l">
+      <header class="mb4">
+        <p class="f6 b helvetica tracked mt0">
+          POSTS
+        </p>
+        <h1 class="f1 mt2 mb2">
+          MLA(Multi-Head Latent Attention)
+        </h1>
+        
+        <p class="tracked mt2 mb1">
+          By <strong>
+            
+            ZhongsJie
+            
+          </strong>
+        </p>
+        
+        <time class="f6 dib tracked" datetime="2026-06-08T23:39:17+08:00" >June 8, 2026</time>
+        
+        <span class="f6 dib tracked"> - 15 minutes read</span>
+        <span class="f6 dib tracked"> - 7277 words</span>
+        
+        <div class="mt2"><ul class="pa0">
+  
+   <li class="list di">
+     <a href="../../tags/deepseek/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">Deepseek</a>
+   </li>
+  
+   <li class="list di">
+     <a href="../../tags/inference/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">Inference</a>
+   </li>
+  
+   <li class="list di">
+     <a href="../../tags/attention/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">Attention</a>
+   </li>
+  
+</ul>
+</div>
+      </header>
+
+      <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray">
+        <p><img src="../../images/2026-06/Pasted%20image%2020260608085830.png" alt=""></p>
+<h2 id="mha多头注意力">
+    MHA（多头注意力）<a class="hash-link" href="#mha%e5%a4%9a%e5%a4%b4%e6%b3%a8%e6%84%8f%e5%8a%9b" title="Direct link to heading">#</a>
+</h2>$$Attention(Q, K, V) = softmax(Q·K^T / \sqrt{d_h}) · V$$<p>
+</p>
+$$q_t = W^Q h_t$$<p>
+</p>
+$$k_t = W^K h_t$$<p>
+</p>
+$$v_t = W^V h_t$$<ul>
+<li>$d$: Embedding维度；</li>
+<li>$d_h$：每一个头的维度；</li>
+<li>$n_h$: Attention头数；</li>
+<li>$h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入；</li>
+<li>$W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ；</li>
+<li>$q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ；
+$$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$
+$$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$
+$$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$
+$$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$
+$$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$</li>
+<li>$q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头；</li>
+<li>$W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵；</li>
+<li>每个 token 单层需要缓存的 cache 的是 $n_h$ 套 ($k,v$) — 共 $2n_hd_h$</li>
+</ul>
+<h2 id="mqa多查询注意力">
+    MQA（多查询注意力）<a class="hash-link" href="#mqa%e5%a4%9a%e6%9f%a5%e8%af%a2%e6%b3%a8%e6%84%8f%e5%8a%9b" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>所有 $n_h$ 个 Q head 共享同一套 K、V，只剩 1 套，更快的推理速度：由于内存和缓存需求大幅下降，内存带宽开销也基本消除。虽然训练效率基本保持不变，但与 MHA 相比，共享 K/V 对可能会导致模型质量和输出精度略有下降</p>
+</blockquote>
+$$
+q_{t,i} = W_{i}^Q · h_t,
+\qquad
+k_{t} = W^K h_t,
+\qquad
+v_{t} = W^V h_t
+$$\[
+\operatorname{head}_{(i)}
+= \operatorname{softmax}
+\left(
+\frac{
+Q_{i}K^{\top}
+}{
+\sqrt{d_h}
+}
++
+M
+\right)
+V,
+\qquad
+i = 1, \cdots, n_h
+\]<ul>
+<li>$W^K, W^V \in \mathbb{R}^{d_h \times d}$ —— 所有 head 共享同一份 K、V 投影。</li>
+<li>cache 收缩到 $2d_h$，比 MHA 小 $n_h$ 倍；但表达能力受限，大模型直接套 MQA 容易掉点 —— 工程上很少单独使用，更多被 GQA 替代。</li>
+</ul>
+<h2 id="gqa分组注意力">
+    GQA（分组注意力）<a class="hash-link" href="#gqa%e5%88%86%e7%bb%84%e6%b3%a8%e6%84%8f%e5%8a%9b" title="Direct link to heading">#</a>
+</h2><p>把 $n_h$ 个 Q head 切成 $n_{kv}$ 组，组内共享 K、V —— 是 MHA 与 MQA 之间的连续插值：</p>
+$$
+q_{t,i} = W_{i}^Q · h_t,
+\qquad
+k_{t} = W^K_g h_t,
+\qquad
+v_{t} = W^V_g h_t
+$$\[
+\operatorname{head}_{(h)}
+= \operatorname{softmax}
+\left(
+\frac{
+Q_{(h)} K_{(g(h))}^{\top}
+}{
+\sqrt{d_h}
+}
++
+M
+\right)
+V_{(g(h))},
+\qquad
+g(h) = \left\lfloor \frac{h \cdot n_{kv}}{n_h} \right\rfloor
+\]<ul>
+<li>$W^K_{(g)}, W^V_{(g)} \in \mathbb{R}^{d_h \times d}$，$g = 1, \cdots, n_{kv}$ —— 每组一份 K、V 投影。</li>
+<li>$g(h)$ —— 第 $h$ 个 Q head 所属的组索引。</li>
+<li>$n_{kv} = n_h$ 退化为 MHA，$n_{kv} = 1$ 退化为 MQA。</li>
+<li>kernel 里只实际算 $n_{kv}$ 套 K、V，分数计算时把 K、V 沿 group 维 broadcast 到 $n_h$，不真的复制张量。</li>
+<li>每Token需要缓存$2d_hn_{kv}$</li>
+<li>Llama 3 70B：$n_h = 64$，$n_{kv} = 8$，$d_h = 128$，单 token cache，比同样大小的 MHA 小 $8$ 倍。</li>
+</ul>
+$$
+2 \cdot 8 \cdot 128 \cdot 2\text{B} = 4\text{KB} / \text{layer}
+$$<h2 id="mla多头潜在注意力">
+    MLA（多头潜在注意力）<a class="hash-link" href="#mla%e5%a4%9a%e5%a4%b4%e6%bd%9c%e5%9c%a8%e6%b3%a8%e6%84%8f%e5%8a%9b" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>标准 MHA 中: $k_t = W^K·h_t, v_t = W^V·h_t$，均为从 $h_t ∈ ℝ^{4096}$ 投影而来。虽然 K 和 V 投影后的维度是 $d_h·n_h = 16384$，但它们的秩不会超过 4096 ($h_t$ 的维度)。<strong>这 16384 维中存在大量线性相关的冗余</strong>。而GQA 只是按 head 数线性缩 cache，MLA将完整的 K/V 向量替换为一个低维隐向量的缓存 $c^{KV}$，推理时通过矩阵吸收技巧避免显式恢复完整 K/V。通过优化KV-cache来减少显存占用，从而提升推理性能。</p>
+</blockquote>
+<h3 id="低秩-kv-联合压缩">
+    低秩 KV 联合压缩<a class="hash-link" href="#%e4%bd%8e%e7%a7%a9-kv-%e8%81%94%e5%90%88%e5%8e%8b%e7%bc%a9" title="Direct link to heading">#</a>
+</h3><p>将高维 $h_t$ 压缩到低维隐空间:</p>
+$$c_t^{KV} = W^{DKV} · h_t$$<ul>
+<li>$c_t^{KV} ∈ ℝ^{d_c}$  ：压缩后的 KV 联合隐向量, $d_c \ll d_hd_n$</li>
+<li>$W^{DKV} ∈ ℝ^{d_c \times  d}$： 下投影矩阵 ，低秩变化矩阵</li>
+<li>$d_c = 512$ ：论文中取$4\times d_h$，远小于 $d_h·n_h$ = 16384 (压缩比 32:1)
+$$k_t^{C}=W^{UK} · c_t^{KV}$$
+$$v_t^{C}=W^{UV} · c_t^{KV}$$</li>
+<li>$W^{UK}, W^{UV} ∈ ℝ^{d_hn_h \times  d_c}$： 上投影矩阵</li>
+</ul>
+<p>经过上述变化，通过两个低秩变化矩阵先做压缩、再做扩展，最终能降低参数的数量。MLA本质是要做到减少KV-cache的存储，在推理过程中只需要缓存$c_t^{KV}$， $W^{UK}$可以吸收到$W^Q$， $W^{UV}$可以吸收到$W^O$。为了减少激活的内存量，在训练过程中，deepseek也会对$Q$采用类似的低秩化操作（不减少缓存）：
+</p>
+$$c_t^{Q}=W^{DQ} · h_t$$<p>
+</p>
+$$q_t^{Q}=W^{UQ} · c_t^{Q}$$<ul>
+<li>$W^{DQ} ∈ ℝ^{d_c^{'} \times  d}$： 下投影矩阵</li>
+<li>$W^{UQ} ∈ ℝ^{d_hn_h \times  d_c^{'}}$： 上投影矩阵</li>
+<li>$d_c^{'}\ll d_hn_h$:  Deepseek中使用1536</li>
+</ul>
+<p>在低秩化过程中<strong>可能存在的问题</strong>是：如果真实的数据分布在很多&quot;方向&quot;上都有重要成分，而你选的秩 $r$ 不够大，那么：</p>
+<ul>
+<li>某些方向的信息会被强行压扁甚至抹掉；</li>
+<li>在 attention 里体现为：某些 token 间的相关性被低估或高估，注意力图更&quot;粗糙&quot;。</li>
+</ul>
+<h4 id="矩阵吸收计算">
+    矩阵吸收计算<a class="hash-link" href="#%e7%9f%a9%e9%98%b5%e5%90%b8%e6%94%b6%e8%ae%a1%e7%ae%97" title="Direct link to heading">#</a>
+</h4><blockquote>
+<p>&ldquo;矩阵吸收&quot;本质上就是：把两个线性变换先乘好，合成到一个矩阵里，从而少做一次矩阵乘法或少存一套权重。</p>
+</blockquote>
+$$x_1^{'T}x_2^{'} = (Px_1)^{T}{Qx_2} = x_1^{T}(P^TQ)x_2=x_1^{T}Q^{'}x_2=x_1^{T}x_2^{''}$$<p>
+在 MLA 里这么做有两个现实收益：</p>
+<ul>
+<li>减少一次 matmul 或在 kernel 里直接用 fused 权重，少访存、易优化。</li>
+<li>既然 key/value 的上投影 $W_{UK}, W_{UV}$ 被吸掉了，推理阶段只需要缓存 latent  $c^{KV}$不用缓存大维 K/V，本身的 KV cache 就能保持极小。</li>
+</ul>
+<h3 id="解耦rope">
+    解耦RoPE<a class="hash-link" href="#%e8%a7%a3%e8%80%a6rope" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>In this way, $𝑊^{𝑈𝐾}$ cannot be absorbed into $𝑊^𝑄$ any more during inference, since a RoPE matrix related to the currently generating token will lie between $𝑊^𝑄$ and $𝑊_{𝑈𝐾}$ and matrix multiplication does not obey a commutative law. <strong>RoPE与低秩KV不兼容，没法做矩阵吸收计算</strong></p>
+</blockquote>
+<ol>
+<li>在不考虑RoPE的情况下：那么 $q, k$ 乘积计算如下，其中 $(i)$ 表示变换矩阵第 $i$ 个 Head 的切片：</li>
+</ol>
+$$
+\begin{aligned}
+q_{t,i}^{T} \times k_{j,i}
+&=
+\left(W_{(i)}^{UQ} c_t^Q\right)^T
+\times
+W_{(i)}^{UK} c_j^{KV}  \\
+&=
+\left(c_t^Q\right)^T
+\times
+\left(W_{(i)}^{UQ}\right)^T W_{(i)}^{UK}
+\times
+c_j^{KV}
+\end{aligned}
+$$<p>
+<strong>不加 RoPE</strong>的情况下，可以提前计算好  $\left(W_{(i)}^{UQ}\right)^T W_{(i)}^{UK}$部分的值，  也就是上面说的 $W^{UK}$ 吸收到 $W^{UQ}$ 中，这样在做 $q$ 的变换的时候，也就同时计算 $W^{UK}$ 矩阵的乘法。
+因此在推理过程中只需要缓存 $c_j^{KV}$，而不是缓存 $W_{(i)}^{UK} \times c_j^{KV}$ 的结果。  而$c_j^{KV}$ 维度只有 $4d_h$ 的长度， $W_{(i)}^{UK} \times c_j^{KV}$ 是个 $4d_h \to d$ 的变换，也就是完全恢复了隐层的维度：
+</p>
+$$
+d = d_h * n_h = 64d_h
+$$<p>
+DeepSeek-V3 中 $n_h$ 配置为 64，这是 MLA 的<strong>压缩 KV Cache 的核心原理</strong>。</p>
+<blockquote>
+<p>$\left(W_{(i)}^{UQ}\right)^TW_{(i)}^{UK}$合并成一个矩阵的恒等变换，虽然算子序列在数学上可交换/重排，但浮点加减乘除不满足严格的结合律，理论上只有在无限精度下才成立，实际上如果我们使用单精度尤其是BF16的话，经过变换后的精度损失往往还是挺明显的，经过多层累积后可能放大到比较可观的程度；</p>
+</blockquote>
+<hr>
+<ol start="2">
+<li>但是在考虑RoPE的场景下，加上 RoPE 后，计算 $q, k$ 乘积，会在 $\left(W_{(i)}^{UQ}\right)^T$ 和 $W_{(i)}^{UK}$ 之间，增加一个融合了相对位置的变量 $\mathcal{R}_{t-j}$，在标准 MHA 里，RoPE 对 <strong>Query 和 Key</strong> 都要进行旋转$q_{t,i}=RoPE(W_{(i)}^{UQ} c_t^Q)=\mathcal{R}_t W_{(i)}^{UQ} c_t^Q$其中$\mathcal{R}_t$为位置$t$的RoPE 位置矩阵：</li>
+</ol>
+$$
+\begin{aligned}
+q_{t,i}^{T} \times k_{j,i}
+&=
+\left(\mathcal{R}_t W_{(i)}^{UQ} c_t^Q\right)^T
+\times
+\mathcal{R}_j W_{(i)}^{UK} c_j^{KV} \\
+&=
+\left(c_t^Q\right)^T
+\times
+\left(W_{(i)}^{UQ}\right)^T
+\mathcal{R}_t^T \mathcal{R}_j
+W_{(i)}^{UK}
+\times c_j^{KV} \\
+&=
+\left(c_t^Q\right)^T
+\times
+\left(W_{(i)}^{UQ}\right)^T
+\mathcal{R}_{t-j}
+W_{(i)}^{UK}
+\times c_j^{KV}
+\end{aligned}
+$$<p>中间这个分量  $\left(W_{(i)}^{UQ}\right)^T \mathcal{R}_{t-j} W_{(i)}^{UK}$  是<strong>随相对位置变化而变化</strong>的，并不是固定的矩阵，并不能提前计算好。  因此 RoPE 与低秩变换不兼容。最简单的方式是放弃RoPE，换用其他基于Attention Bias的位置编码，如ALIBI，但DeepSeek的实验显示它明显不如RoPE（注意，MLA不是不能加RoPE，而是加了RoPE之后无法用恒等变换技巧来减少KV Cache），MLA的本质改进也在于低秩投影之后的RoPE适配工作</p>
+<hr>
+<ol start="3">
+<li>通过增加一个<strong>很小 $q,k$分量</strong>，引入RoPE</li>
+</ol>
+<p>解耦 RoPE 策略。该策略使用额外的多头 Query  $\mathbf{q}_{t,i}^{R} \in \mathbb{R}^{d_h^R}$  以及一个共享的 Key  $\mathbf{k}_{t}^{R} \in \mathbb{R}^{d_h^R}$  来承载 RoPE，其中 $d_h^R$ 表示解耦后的 Query 和 Key 在每个 Head 上的维度。
+在引入解耦 RoPE 策略后，MLA 执行如下计算：</p>
+$$
+[\mathbf{q}_{t,1}^{R}; \mathbf{q}_{t,2}^{R}; \cdots; \mathbf{q}_{t,n_h}^{R}]
+= \mathbf{q}_{t}^{R}
+= \operatorname{RoPE}(W^{QR}\mathbf{c}_{t}^{Q})
+$$$$
+\mathbf{k}_{t}^{R}
+= \operatorname{RoPE}(W^{KR}\mathbf{h}_{t})
+$$$$
+\textcolor{red}{\mathbf{q}_{t,i}
+= [\mathbf{q}_{t,i}^{C}; \mathbf{q}_{t,i}^{R}]}
+$$$$
+\textcolor{red}{\mathbf{k}_{t,i}
+= [\mathbf{k}_{t,i}^{C}; \mathbf{k}_{t}^{R}]}
+$$$$
+\mathbf{o}_{t,i}
+= \sum_{j=1}^{t}
+\operatorname{Softmax}_{j}
+\left(
+\frac{
+\mathbf{q}_{t,i}^{T}\mathbf{k}_{j,i}
+}{
+\sqrt{d_h + d_h^R}
+}
+\right)
+\mathbf{v}_{j,i}^{C}
+$$$$
+\mathbf{u}_{t}
+= W^{O}
+[
+\mathbf{o}_{t,1};
+\mathbf{o}_{t,2};
+\cdots;
+\mathbf{o}_{t,n_h}
+]
+$$<ul>
+<li>$W^{QR} \in \mathbb{R}^{d_h^R n_h \times d_c'}$  $W^{KR} \in \mathbb{R}^{d_h^R \times d}$  ：分别是用于生成解耦 Query 和 Key 的矩阵；</li>
+<li>$\operatorname{RoPE}(\cdot)$ 表示应用 RoPE 矩阵的操作；</li>
+<li>$[\cdot;\cdot]$ 表示拼接操作。</li>
+</ul>
+<p>MLA采取了一种<strong>混合方法</strong>——每个 Attention Head 的 Q、K 新增 $d_r$ 个维度用来添加 RoPE，其中 K 新增的维度每个 Head 共享，将 RoPE 加在 $c_i$ 之后，这样 <strong>$\mathcal{R}_i$ 就可以吸收到 $c_i$ 中去</strong>，但这样就没有：$\mathcal{R}_t^{\top} \mathcal{R}_j=\mathcal{R}_{t-j}$ 的运算，此时的 RoPE 不再是通过绝对位置实现相对位置，而单纯是在 Q、K 上加绝对位置，让模型自己想办法提炼相对位置信息。在推理过程中，解耦后的 Key 也需要被缓存。</p>
+<h3 id="mla完整计算推导">
+    MLA完整计算推导<a class="hash-link" href="#mla%e5%ae%8c%e6%95%b4%e8%ae%a1%e7%ae%97%e6%8e%a8%e5%af%bc" title="Direct link to heading">#</a>
+</h3><p><img src="../../images/2026-06/Pasted%20image%2020260608185756.png" alt=""></p>
+$$
+\begin{aligned}
+\mathbf{c}_t^Q &= W^{DQ}\mathbf{h}_t, \\[4pt]
+[\mathbf{q}_{t,1}^C;\mathbf{q}_{t,2}^C;\cdots;\mathbf{q}_{t,n_h}^C]
+&= \mathbf{q}_t^C
+= W^{UQ}\mathbf{c}_t^Q, \\[4pt]
+[\mathbf{q}_{t,1}^R;\mathbf{q}_{t,2}^R;\cdots;\mathbf{q}_{t,n_h}^R]
+&= \mathbf{q}_t^R
+= \operatorname{RoPE}(W^{QR}\mathbf{c}_t^Q), \\[4pt]
+\mathbf{q}_{t,i}
+&= [\mathbf{q}_{t,i}^C;\mathbf{q}_{t,i}^R], \\[8pt]
+\textcolor{red}{\mathbf{c}_t^{KV}}
+&= W^{DKV}\mathbf{h}_t, \\[4pt]
+[\mathbf{k}_{t,1}^C;\mathbf{k}_{t,2}^C;\cdots;\mathbf{k}_{t,n_h}^C]
+&= \mathbf{k}_t^C
+= W^{UK}\mathbf{c}_t^{KV}, \\[4pt]
+\textcolor{red}{\mathbf{k}_t^R}
+&= \operatorname{RoPE}(W^{KR}\mathbf{h}_t), \\[4pt]
+\mathbf{k}_{t,i}
+&= [\mathbf{k}_{t,i}^C;\mathbf{k}_t^R], \\[8pt]
+[\mathbf{v}_{t,1}^C;\mathbf{v}_{t,2}^C;\cdots;\mathbf{v}_{t,n_h}^C]
+&= \mathbf{v}_t^C
+= W^{UV}\mathbf{c}_t^{KV}, \\[8pt]
+\mathbf{o}_{t,i}
+&=
+\sum_{j=1}^{t}
+\operatorname{Softmax}_{j}
+\left(
+\frac{
+\mathbf{q}_{t,i}^{T}\mathbf{k}_{j,i}
+}{
+\sqrt{d_h + d_h^R}
+}
+\right)
+\mathbf{v}_{j,i}^C, \\[8pt]
+\mathbf{u}_t
+&=
+W^O[\mathbf{o}_{t,1};\mathbf{o}_{t,2};\cdots;\mathbf{o}_{t,n_h}].
+\end{aligned}
+$$<ul>
+<li>$\mathbf{c}_t^{KV}$ 是低秩压缩的向量， 维度是$4\times d_h=512$</li>
+<li>$\mathbf{k}_t^R$ 是引入位置编码的MQA范式计算的共享$k$，维度$d_h/2=64$</li>
+</ul>
+$$
+\begin{aligned}
+q_{t,i}^{T} \times k_{j,i}
+= [q_{t,i}^{C}; q_{t,i}^{R}]^{T}
+\times
+[k_{j,i}^{C}; k_{t}^{R}]
+&=
+q_{t,i}^{C} k_{j,i}^{C}
++
+q_{t,i}^{R} k_{t}^{R} \\
+q_{t,i}^{C} k_{j,i}^{C}
+&=
+(c_t^Q)^T
+(W_{(i)}^{UQ})^T
+W_{(i)}^{UK}
+c_j^{KV} \\
+\tilde{q}_{t,i}^{C}
+&=
+(c_t^Q)^T
+(W_{(i)}^{UQ})^T
+W_{(i)}^{UK} \\
+q_{t,i}^{C} k_{j,i}^{C}
+&=
+\tilde{q}_{t,i}^{C} c_j^{KV}
+\end{aligned}
+$$<p>前一项 $q_{t,i}^{C} k_{j,i}^{C}$ 通过矩阵吸收处理，全 Head 只需要缓存一个 $c_t^{KV}$；后一项 $q_{t,i}^{R} k_t^{R}$ 按正常 MQA 的方式计算，全 Head 只需要缓存一个共享的 $k^R$。
+</p>
+$$
+\begin{aligned}
+s_{t,j,i}
+= \frac{
+q_{t,i}^{T} k_{j,i}
+}{
+\sqrt{d_h + d_h^R}
+}
+&=
+\frac{
+q_{t,i}^{C} k_{j,i}^{C}
++
+q_{t,i}^{R} k_{j}^{R}
+}{
+\sqrt{d_h + d_h^R}
+} \\
+a_{t,j,i}
+&=
+\operatorname{Softmax}_j
+\left(
+\frac{
+\tilde{q}_{t,i}^{C} c_j^{KV}
++
+(q_{t,i}^{R})^T k_j^{R}
+}{
+\sqrt{d_h + d_h^R}
+}
+\right) \\
+o_{t,i}
+&=
+\sum_{j=1}^{t}
+a_{t,j,i}
+v_{j,i}^{C} \\
+o_{t,i}
+&=
+\sum_{j=1}^{t}
+\operatorname{Softmax}_j
+\left(
+\frac{
+\tilde{q}_{t,i}^{C} \textcolor{red}{c_j^{KV}}
++
+(q_{t,i}^{R})^T \textcolor{red}{k_j^{R}}
+}{
+\sqrt{d_h + d_h^R}
+}
+\right)
+v_{j,i}^{C}
+\end{aligned}
+$$<p>
+因此，推理阶段实际需要缓存的是：</p>
+$$
+\{c_j^{KV}, k_j^R\}_{j=1}^{t}
+$$<p>而不是完整的：</p>
+$$
+\{k_{j,i}, v_{j,i}\}_{i=1}^{n_h}
+$$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d_h^R$
+其中 $c_j^{KV}$ 负责承载可被低秩压缩的 K/V 信息，$k_j^R$ 负责承载不能被矩阵吸收的 RoPE 位置信息。</p>
+<h3 id="mla-mode">
+    MLA Mode<a class="hash-link" href="#mla-mode" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>MLA模块有两种计算模式，在DeepseekV3.2的报告中，非吸收矩阵用<strong>MHA mode表示</strong>，吸收矩阵用<strong>MQA mode表示</strong>。MHA模式在prefill阶段使用，MQA模式在decode阶段使用。</p>
+</blockquote>
+<p><img src="../../images/2026-06/Pasted%20image%2020260608192754.png" alt=""></p>
+<ul>
+<li>在推理中可根据阶段的特征来选择形态，因为<strong>序列的变化</strong>会让两种计算形态的<strong>计算量</strong>、<strong>显存占用量</strong>不一样！ 序列的变化包括每次输入MLA的序列长度，以及历史的KV cache长度。</li>
+</ul>
+<p>差异点：</p>
+<ul>
+<li>Q:  吸收形态的$q_{nope}$后面多了一个矩阵乘法运算；</li>
+<li>KV: 非吸收形态要经过上采样后再进行attention计算，而吸收形态不用。吸收形态KV的head只有一份(相当于MQA)；</li>
+<li>$O$： 吸收矩阵MLA的O线性层计算前多了一个V转移过来的矩阵乘法；</li>
+</ul>
+<h2 id="attention-对比参数量--kv-cache">
+    Attention 对比：参数量 / KV cache<a class="hash-link" href="#attention-%e5%af%b9%e6%af%94%e5%8f%82%e6%95%b0%e9%87%8f--kv-cache" title="Direct link to heading">#</a>
+</h2><h3 id="参数量对比单层">
+    参数量对比（单层）<a class="hash-link" href="#%e5%8f%82%e6%95%b0%e9%87%8f%e5%af%b9%e6%af%94%e5%8d%95%e5%b1%82" title="Direct link to heading">#</a>
+</h3><style>
+.param-table { border-collapse: collapse; width: 100%; }
+.param-table th, .param-table td { padding: 6px 20px; text-align: left; white-space: nowrap; }
+.param-table tr.sep td { border-bottom: 2px solid #333; }
+.param-table tr.sep-top td { border-top: 2px solid #333; }
+</style>
+<table class="param-table">
+  <tr class="sep-top"><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr>
+    <th>步骤</th>
+    <th>MHA</th>
+    <th>MQA</th>
+    <th>GQA</th>
+    <th>MLA</th>
+  </tr>
+  <tr class="sep"><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr>
+    <td>Q 投影</td>
+    <td>$H⋅n_hd_h$</td>
+    <td>$H⋅n_hd_h$</td>
+    <td>$H⋅n_hd_h$</td>
+    <td>$Hd_h′+d_h′⋅n_hd_h$</td>
+  </tr>
+  <tr>
+    <td>K 投影</td>
+    <td>$H⋅n_hd_h$</td>
+    <td>$H⋅d_h$</td>
+    <td>$H⋅n_{kv}d_h$</td>
+    <td>$Hd_c+d_c⋅n_hd_h$</td>
+  </tr>
+  <tr>
+    <td>V 投影</td>
+    <td>$H⋅n_hd_h$</td>
+    <td>$H⋅d_h$</td>
+    <td>$H⋅n_{kv}d_h$</td>
+    <td>$d_c⋅n_hd_h$（与 K 共用 $W^{DKV}$）</td>
+  </tr>
+  <tr>
+    <td>RoPE 分支</td>
+    <td>—</td>
+    <td>—</td>
+    <td>—</td>
+    <td>$d_h′⋅n_hd_r+Hd_r$</td>
+  </tr>
+  <tr>
+    <td>$W^O$</td>
+    <td>$n_hd_h⋅H$</td>
+    <td>$n_hd_h⋅H$</td>
+    <td>$n_hd_h⋅H$</td>
+    <td>$n_hd_h⋅H$</td>
+  </tr>
+  <tr class="sep"><td></td><td></td><td></td><td></td><td></td></tr>
+</table>
+<h3 id="kv-cache对比">
+    KV cache对比<a class="hash-link" href="#kv-cache%e5%af%b9%e6%af%94" title="Direct link to heading">#</a>
+</h3><p><img src="../../images/2026-06/Pasted%20image%2020260608175328.png" alt=""></p>
+<h2 id="mla-vllm框架代码实现">
+    MLA vllm框架代码实现<a class="hash-link" href="#mla-vllm%e6%a1%86%e6%9e%b6%e4%bb%a3%e7%a0%81%e5%ae%9e%e7%8e%b0" title="Direct link to heading">#</a>
+</h2><p>vLLM 对 DeepSeek V2/V3/R1 一类 MLA（Multi-head Latent Attention）的支持：</p>
+<ol>
+<li>在模型层把 DeepSeek 的普通 attention、未优化 MLA、优化 MLA 分成三条路径。
+<ul>
+<li><code>DeepseekAttention</code>：普通 MHA，用传统 <code>Attention</code>。</li>
+<li><code>DeepseekV2Attention</code>：保留 DeepSeek MLA 数学结构，但把 latent KV 展开成普通 K/V 后走 <code>Attention</code>，不是 cache 优化路径。</li>
+<li><code>DeepseekV2MLAAttention</code>：真正的 vLLM MLA 优化路径，使用 latent KV cache 和 MLA backend。</li>
+</ul>
+</li>
+<li>用 <code>MultiHeadLatentAttentionWrapper</code> 和 <code>MLAAttention</code> 把 MLA 的外层投影、RoPE、KV cache 写入和 attention backend 调用解耦。</li>
+<li>把 KV cache 从传统 <code>[K, V]</code> 双缓存改成每 token 一个 latent 向量：<code>[kv_lora_rank + qk_rope_head_dim]</code>。</li>
+<li>在推理时按 scheduler metadata 把 batch 拆成 prefill 和 decode：prefill 使用计算友好的 MHA 形式，decode 使用访存友好的 MQA 形式。</li>
+</ol>
+<h3 id="配置读取">
+    配置读取<a class="hash-link" href="#%e9%85%8d%e7%bd%ae%e8%af%bb%e5%8f%96" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># 从 HuggingFace config 读取 MLA 维度。</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># qk_nope_head_dim: 不参与 RoPE 的 Q/K 维度。</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># qk_rope_head_dim: 参与 RoPE 的 Q/K 维度。</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># v_head_dim: value head dim。</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># kv_lora_rank: compressed KV latent rank。</span>
+</span></span><span style="display:flex;"><span>qk_nope_head_dim <span style="color:#f92672">=</span> getattr(config, <span style="color:#e6db74">&#34;qk_nope_head_dim&#34;</span>, <span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>qk_rope_head_dim <span style="color:#f92672">=</span> getattr(config, <span style="color:#e6db74">&#34;qk_rope_head_dim&#34;</span>, <span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>v_head_dim <span style="color:#f92672">=</span> getattr(config, <span style="color:#e6db74">&#34;v_head_dim&#34;</span>, <span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>kv_lora_rank <span style="color:#f92672">=</span> getattr(config, <span style="color:#e6db74">&#34;kv_lora_rank&#34;</span>, <span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># DeepSeek v1 或没有 MLA 维度时，走普通 MHA。</span>
+</span></span><span style="display:flex;"><span>use_mha <span style="color:#f92672">=</span> config<span style="color:#f92672">.</span>model_type <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;deepseek&#34;</span> <span style="color:#f92672">or</span> all(
+</span></span><span style="display:flex;"><span>    dim <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span> <span style="color:#66d9ef">for</span> dim <span style="color:#f92672">in</span> (qk_nope_head_dim, qk_rope_head_dim)
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> use_mha:
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 普通 MHA：传统 Q/K/V cache。</span>
+</span></span><span style="display:flex;"><span>    attn_cls <span style="color:#f92672">=</span> DeepseekAttention
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">elif</span> model_config<span style="color:#f92672">.</span>use_mla:
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 优化 MLA：latent KV cache + MLA backend。</span>
+</span></span><span style="display:flex;"><span>    attn_cls <span style="color:#f92672">=</span> DeepseekV2MLAAttention
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 数学上仍是 MLA，但会展开成普通 K/V 后走通用 Attention。</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 这是禁用 MLA 优化时的回退路径。</span>
+</span></span><span style="display:flex;"><span>    attn_cls <span style="color:#f92672">=</span> DeepseekV2Attention
+</span></span></code></pre></div><h3 id="deepseekv2mlaattention初始化">
+    DeepseekV2MLAAttention初始化<a class="hash-link" href="#deepseekv2mlaattention%e5%88%9d%e5%a7%8b%e5%8c%96" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DeepseekV2MLAAttention</span>(nn<span style="color:#f92672">.</span>Module):
+</span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    核心组件:
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    - q_lora_rank: Q 的低秩维度
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    - kv_lora_rank: KV 的低秩维度
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    - fused_qkv_a_proj: 融合的 QKV 投影
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    - q_a_layernorm, q_b_proj: Q 的低秩分解
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    - kv_a_layernorm, kv_b_proj: KV 的低秩分解
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    - o_proj: 输出投影
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    &#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">__init__</span>(self, <span style="color:#f92672">...</span>):
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>q_lora_rank <span style="color:#f92672">is</span> <span style="color:#f92672">not</span> <span style="color:#66d9ef">None</span>:
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># DeepSeek V3/R1 常见路径：把 q_a_proj 和 kv_a_proj 融合成一个 GEMM。</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># 输出维度是 [q_lora_rank, kv_lora_rank + qk_rope_head_dim]。</span>
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>fused_qkv_a_proj <span style="color:#f92672">=</span> DeepSeekV2FusedQkvAProjLinear(
+</span></span><span style="display:flex;"><span>                proj_input_size,
+</span></span><span style="display:flex;"><span>                [self<span style="color:#f92672">.</span>q_lora_rank, self<span style="color:#f92672">.</span>kv_lora_rank <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>qk_rope_head_dim],
+</span></span><span style="display:flex;"><span>                quant_config<span style="color:#f92672">=</span>quant_config,
+</span></span><span style="display:flex;"><span>                prefix<span style="color:#f92672">=</span><span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{</span>prefix<span style="color:#e6db74">}</span><span style="color:#e6db74">.fused_qkv_a_proj&#34;</span>,
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># 没有 q_lora_rank 时，KV latent 单独投影。</span>
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>kv_a_proj_with_mqa <span style="color:#f92672">=</span> ReplicatedLinear(
+</span></span><span style="display:flex;"><span>                proj_input_size,
+</span></span><span style="display:flex;"><span>                self<span style="color:#f92672">.</span>kv_lora_rank <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>qk_rope_head_dim,
+</span></span><span style="display:flex;"><span>                bias<span style="color:#f92672">=</span><span style="color:#66d9ef">False</span>,
+</span></span><span style="display:flex;"><span>                quant_config<span style="color:#f92672">=</span>quant_config,
+</span></span><span style="display:flex;"><span>                prefix<span style="color:#f92672">=</span><span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{</span>prefix<span style="color:#e6db74">}</span><span style="color:#e6db74">.kv_a_proj_with_mqa&#34;</span>,
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># KV latent 先 RMSNorm，再通过 kv_b_proj 展开成每个 head 的 k_nope + v。</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>kv_a_layernorm <span style="color:#f92672">=</span> RMSNorm(self<span style="color:#f92672">.</span>kv_lora_rank, eps<span style="color:#f92672">=</span>config<span style="color:#f92672">.</span>rms_norm_eps)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>kv_b_proj <span style="color:#f92672">=</span> ColumnParallelLinear(
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>kv_lora_rank,
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>num_heads <span style="color:#f92672">*</span> (self<span style="color:#f92672">.</span>qk_nope_head_dim <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>v_head_dim),
+</span></span><span style="display:flex;"><span>            bias<span style="color:#f92672">=</span><span style="color:#66d9ef">False</span>,
+</span></span><span style="display:flex;"><span>            quant_config<span style="color:#f92672">=</span>quant_config,
+</span></span><span style="display:flex;"><span>            prefix<span style="color:#f92672">=</span><span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{</span>prefix<span style="color:#e6db74">}</span><span style="color:#e6db74">.kv_b_proj&#34;</span>,
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 输出投影。注意 MLA attention 内部先得到 [heads * v_head_dim]，</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 最后仍需 o_proj 回到 hidden_size。</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>o_proj <span style="color:#f92672">=</span> RowParallelLinear(
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>num_heads <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>v_head_dim,
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>hidden_size,
+</span></span><span style="display:flex;"><span>            bias<span style="color:#f92672">=</span><span style="color:#66d9ef">False</span>,
+</span></span><span style="display:flex;"><span>            quant_config<span style="color:#f92672">=</span>quant_config,
+</span></span><span style="display:flex;"><span>            prefix<span style="color:#f92672">=</span><span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{</span>prefix<span style="color:#e6db74">}</span><span style="color:#e6db74">.o_proj&#34;</span>,
+</span></span><span style="display:flex;"><span>        )
+</span></span></code></pre></div><p>MLA 的核心参数关系：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-text" data-lang="text"><span style="display:flex;"><span>cache entry dim = kv_lora_rank + qk_rope_head_dim
+</span></span><span style="display:flex;"><span>q head dim      = qk_nope_head_dim + qk_rope_head_dim
+</span></span><span style="display:flex;"><span>value head dim  = v_head_dim
+</span></span></code></pre></div><p>DeepSeek R1/V3 常见值：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-text" data-lang="text"><span style="display:flex;"><span>kv_lora_rank = 512
+</span></span><span style="display:flex;"><span>qk_rope_head_dim = 64
+</span></span><span style="display:flex;"><span>cache entry dim = 576
+</span></span></code></pre></div><h3 id="mla-wrapper前处理">
+    MLA Wrapper前处理<a class="hash-link" href="#mla-wrapper%e5%89%8d%e5%a4%84%e7%90%86" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#a6e22e">@PluggableLayer.register</span>(<span style="color:#e6db74">&#34;multi_head_latent_attention&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MultiHeadLatentAttentionWrapper</span>(PluggableLayer):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward</span>(self, positions, hidden_states, llama_4_scaling<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>):
+</span></span><span style="display:flex;"><span>        q_c <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span>        kv_lora <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>q_lora_rank <span style="color:#f92672">is</span> <span style="color:#f92672">not</span> <span style="color:#66d9ef">None</span>:
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># 一次 fused projection 同时得到 Q 的低秩表示 q_c，</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># 以及 KV cache 所需的 kv_lora。</span>
+</span></span><span style="display:flex;"><span>            qkv_lora <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>fused_qkv_a_proj(hidden_states)[<span style="color:#ae81ff">0</span>]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># q_c:      [tokens, q_lora_rank]</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># kv_lora:  [tokens, kv_lora_rank + qk_rope_head_dim]</span>
+</span></span><span style="display:flex;"><span>            q_c, kv_lora <span style="color:#f92672">=</span> qkv_lora<span style="color:#f92672">.</span>split(
+</span></span><span style="display:flex;"><span>                [self<span style="color:#f92672">.</span>q_lora_rank, self<span style="color:#f92672">.</span>kv_lora_rank <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>qk_rope_head_dim],
+</span></span><span style="display:flex;"><span>                dim<span style="color:#f92672">=-</span><span style="color:#ae81ff">1</span>,
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># Q 低秩表示归一化后上投影为完整 Q。</span>
+</span></span><span style="display:flex;"><span>            q_c <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>q_a_layernorm(q_c)
+</span></span><span style="display:flex;"><span>            q <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>q_b_proj(q_c)[<span style="color:#ae81ff">0</span>]
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># 非 q_lora 路径：Q 和 KV latent 分开算。</span>
+</span></span><span style="display:flex;"><span>            kv_lora <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>kv_a_proj_with_mqa(hidden_states)[<span style="color:#ae81ff">0</span>]
+</span></span><span style="display:flex;"><span>            q <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>q_proj(hidden_states)[<span style="color:#ae81ff">0</span>]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># kv_c 是 compressed KV latent。</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># k_pe 是 decoupled rope key。</span>
+</span></span><span style="display:flex;"><span>        kv_c, k_pe <span style="color:#f92672">=</span> kv_lora<span style="color:#f92672">.</span>split([self<span style="color:#f92672">.</span>kv_lora_rank, self<span style="color:#f92672">.</span>qk_rope_head_dim], dim<span style="color:#f92672">=-</span><span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 重要：写入 KV cache 的不是原始 kv_c，而是 RMSNorm 后的 kv_c_normed。</span>
+</span></span><span style="display:flex;"><span>        kv_c_normed <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>kv_a_layernorm(kv_c)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Q reshape 成 [tokens, local_heads, qk_head_dim]。</span>
+</span></span><span style="display:flex;"><span>        q <span style="color:#f92672">=</span> q<span style="color:#f92672">.</span>view(<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>, self<span style="color:#f92672">.</span>num_heads, self<span style="color:#f92672">.</span>qk_head_dim)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># k_pe 是 MQA 形态：所有 head 共享一份 rope key，所以 head 维是 1。</span>
+</span></span><span style="display:flex;"><span>        k_pe <span style="color:#f92672">=</span> k_pe<span style="color:#f92672">.</span>unsqueeze(<span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>rotary_emb <span style="color:#f92672">is</span> <span style="color:#f92672">not</span> <span style="color:#66d9ef">None</span>:
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># 只对 Q 的 rope 部分和 K 的 rope 部分做 RoPE。</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># Q 的 nope 部分不参与 RoPE。</span>
+</span></span><span style="display:flex;"><span>            q[<span style="color:#f92672">...</span>, self<span style="color:#f92672">.</span>qk_nope_head_dim :], k_pe <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>rotary_emb(
+</span></span><span style="display:flex;"><span>                positions, q[<span style="color:#f92672">...</span>, self<span style="color:#f92672">.</span>qk_nope_head_dim :], k_pe
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># sparse MLA 时，额外算 top-k indices，供 sparse backend 选择历史 token。</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>indexer <span style="color:#f92672">and</span> self<span style="color:#f92672">.</span>is_sparse:
+</span></span><span style="display:flex;"><span>            _topk_indices <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>indexer(
+</span></span><span style="display:flex;"><span>                hidden_states, q_c, positions, self<span style="color:#f92672">.</span>indexer_rope_emb
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 进入通用 MLA attention 层。</span>
+</span></span><span style="display:flex;"><span>        attn_out <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>mla_attn(
+</span></span><span style="display:flex;"><span>            q,
+</span></span><span style="display:flex;"><span>            kv_c_normed,
+</span></span><span style="display:flex;"><span>            k_pe,
+</span></span><span style="display:flex;"><span>            output_shape<span style="color:#f92672">=</span>(hidden_states<span style="color:#f92672">.</span>shape[<span style="color:#ae81ff">0</span>], self<span style="color:#f92672">.</span>num_heads <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>v_head_dim),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># attention 输出仍需 o_proj。</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> self<span style="color:#f92672">.</span>o_proj(attn_out)[<span style="color:#ae81ff">0</span>]
+</span></span></code></pre></div><p>可以理解为 MLA 的&quot;外层预处理&rdquo;：</p>
+<ul>
+<li>Q 会形成完整 head 维。</li>
+<li>KV 不会展开成 K/V，而是保留 <code>kv_c_normed + k_pe</code>。</li>
+<li>cache 写入的数据就是 <code>kv_c_normed + k_pe</code>。</li>
+</ul>
+<h3 id="mlaattention-初始化确定-cache-entry-形态和-backend">
+    MLAAttention 初始化：确定 cache entry 形态和 backend<a class="hash-link" href="#mlaattention-%e5%88%9d%e5%a7%8b%e5%8c%96%e7%a1%ae%e5%ae%9a-cache-entry-%e5%bd%a2%e6%80%81%e5%92%8c-backend" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MLAAttention</span>(nn<span style="color:#f92672">.</span>Module, AttentionLayerBase):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">__init__</span>(<span style="color:#f92672">...</span>):
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">...</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>num_heads <span style="color:#f92672">=</span> num_heads
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>scale <span style="color:#f92672">=</span> scale
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>qk_nope_head_dim <span style="color:#f92672">=</span> qk_nope_head_dim
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>qk_rope_head_dim <span style="color:#f92672">=</span> qk_rope_head_dim
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>v_head_dim <span style="color:#f92672">=</span> v_head_dim
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>q_lora_rank <span style="color:#f92672">=</span> q_lora_rank
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>kv_lora_rank <span style="color:#f92672">=</span> kv_lora_rank
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>kv_b_proj <span style="color:#f92672">=</span> kv_b_proj
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># MLA cache 每个 token 只有一个向量：</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># [kv_lora_rank, qk_rope_head_dim]</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 所以 head_size 不是 qk_head_dim，也不是 v_head_dim。</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>head_size <span style="color:#f92672">=</span> kv_lora_rank <span style="color:#f92672">+</span> qk_rope_head_dim
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># MLA 的 KV head 固定为 1，因为 latent KV 是 MQA 风格共享的。</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>num_kv_heads <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>qk_head_dim <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>qk_nope_head_dim <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>qk_rope_head_dim
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># use_mla=True 是 backend 选择的关键。</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># use_sparse=True 时会选择 sparse MLA backend。</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>attn_backend <span style="color:#f92672">=</span> get_attn_backend(
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>head_size,
+</span></span><span style="display:flex;"><span>            dtype,
+</span></span><span style="display:flex;"><span>            kv_cache_dtype,
+</span></span><span style="display:flex;"><span>            use_mla<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>,
+</span></span><span style="display:flex;"><span>            use_sparse<span style="color:#f92672">=</span>use_sparse,
+</span></span><span style="display:flex;"><span>            num_heads<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>num_heads,
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># backend impl 接收 MLA 专用维度和 kv_b_proj。</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># kv_b_proj 后续用于 prefill 展开 K/V，也用于权重后处理拆 W_UK/W_UV。</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>impl <span style="color:#f92672">=</span> impl_cls(
+</span></span><span style="display:flex;"><span>            num_heads<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>num_heads,
+</span></span><span style="display:flex;"><span>            head_size<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>head_size,
+</span></span><span style="display:flex;"><span>            scale<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>scale,
+</span></span><span style="display:flex;"><span>            num_kv_heads<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>,
+</span></span><span style="display:flex;"><span>            kv_cache_dtype<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>kv_cache_dtype,
+</span></span><span style="display:flex;"><span>            attn_type<span style="color:#f92672">=</span>AttentionType<span style="color:#f92672">.</span>DECODER,
+</span></span><span style="display:flex;"><span>            q_lora_rank<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>q_lora_rank,
+</span></span><span style="display:flex;"><span>            kv_lora_rank<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>kv_lora_rank,
+</span></span><span style="display:flex;"><span>            qk_nope_head_dim<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>qk_nope_head_dim,
+</span></span><span style="display:flex;"><span>            qk_rope_head_dim<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>qk_rope_head_dim,
+</span></span><span style="display:flex;"><span>            qk_head_dim<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>qk_nope_head_dim <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>qk_rope_head_dim,
+</span></span><span style="display:flex;"><span>            v_head_dim<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>v_head_dim,
+</span></span><span style="display:flex;"><span>            kv_b_proj<span style="color:#f92672">=</span>kv_b_proj,
+</span></span><span style="display:flex;"><span>            indexer<span style="color:#f92672">=</span>indexer,
+</span></span><span style="display:flex;"><span>        )
+</span></span></code></pre></div><ul>
+<li>MLA cache 是 <code>[num_blocks, block_size, kv_lora_rank + qk_rope_head_dim]</code>。</li>
+<li>backend 只需要处理 latent cache，普通 K/V 展开不是 cache 层的职责。</li>
+</ul>
+<h3 id="forward过程先更新kv-cache再计算attention">
+    Forward过程：先更新KV cache，再计算attention<a class="hash-link" href="#forward%e8%bf%87%e7%a8%8b%e5%85%88%e6%9b%b4%e6%96%b0kv-cache%e5%86%8d%e8%ae%a1%e7%ae%97attention" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MLAAttention</span>(nn<span style="color:#f92672">.</span>Module, AttentionLayerBase):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward</span>(self, q, kv_c_normed, k_pe, output_shape<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>):
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>calculate_kv_scales:
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># FP8 / quantized KV cache 场景可动态计算 q/k/v scale。</span>
+</span></span><span style="display:flex;"><span>            torch<span style="color:#f92672">.</span>ops<span style="color:#f92672">.</span>vllm<span style="color:#f92672">.</span>maybe_calc_kv_scales(
+</span></span><span style="display:flex;"><span>                q,
+</span></span><span style="display:flex;"><span>                kv_c_normed,
+</span></span><span style="display:flex;"><span>                k_pe,
+</span></span><span style="display:flex;"><span>                _encode_layer_name(self<span style="color:#f92672">.</span>layer_name),
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>use_direct_call:
+</span></span><span style="display:flex;"><span>            forward_context <span style="color:#f92672">=</span> get_forward_context()
+</span></span><span style="display:flex;"><span>            attn_metadata <span style="color:#f92672">=</span> forward_context<span style="color:#f92672">.</span>attn_metadata
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># 多 layer metadata 以 dict 按 layer_name 存储。</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> isinstance(attn_metadata, dict):
+</span></span><span style="display:flex;"><span>                attn_metadata <span style="color:#f92672">=</span> attn_metadata[self<span style="color:#f92672">.</span>layer_name]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>            self_kv_cache <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>kv_cache
+</span></span><span style="display:flex;"><span>            slot_mapping <span style="color:#f92672">=</span> forward_context<span style="color:#f92672">.</span>slot_mapping
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># slot_mapping 由 scheduler/KV manager 生成，决定当前 token 写到哪个 cache slot。</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># 区分不同的实现（例如Triton。FlashAttn, ...)</span>
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>impl<span style="color:#f92672">.</span>do_kv_cache_update(
+</span></span><span style="display:flex;"><span>                kv_c_normed,
+</span></span><span style="display:flex;"><span>                k_pe,
+</span></span><span style="display:flex;"><span>                self_kv_cache,
+</span></span><span style="display:flex;"><span>                slot_mapping<span style="color:#f92672">.</span>get(self<span style="color:#f92672">.</span>layer_name),
+</span></span><span style="display:flex;"><span>                self<span style="color:#f92672">.</span>kv_cache_dtype,
+</span></span><span style="display:flex;"><span>                self<span style="color:#f92672">.</span>_k_scale,
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># cache 已更新，随后执行 attention。</span>
+</span></span><span style="display:flex;"><span>            output <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>empty(output_shape, dtype<span style="color:#f92672">=</span>q<span style="color:#f92672">.</span>dtype, device<span style="color:#f92672">=</span>q<span style="color:#f92672">.</span>device)
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>forward_impl(
+</span></span><span style="display:flex;"><span>                q,
+</span></span><span style="display:flex;"><span>                kv_c_normed,
+</span></span><span style="display:flex;"><span>                k_pe,
+</span></span><span style="display:flex;"><span>                self_kv_cache,
+</span></span><span style="display:flex;"><span>                attn_metadata,
+</span></span><span style="display:flex;"><span>                output<span style="color:#f92672">=</span>output,
+</span></span><span style="display:flex;"><span>            )
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">return</span> output
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">do_kv_cache_update</span>(
+</span></span><span style="display:flex;"><span>    self,
+</span></span><span style="display:flex;"><span>    kv_c_normed,
+</span></span><span style="display:flex;"><span>    k_pe,
+</span></span><span style="display:flex;"><span>    kv_cache,
+</span></span><span style="display:flex;"><span>    slot_mapping,
+</span></span><span style="display:flex;"><span>    kv_cache_dtype,
+</span></span><span style="display:flex;"><span>    k_scale,
+</span></span><span style="display:flex;"><span>):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> kv_cache<span style="color:#f92672">.</span>numel() <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>:
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># concat_and_cache_mla 会把两段拼起来：</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">#   kv_c_normed: [tokens, kv_lora_rank]</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">#   k_pe:        [tokens, qk_rope_head_dim]</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 写入：</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">#   kv_cache[slot] = [kv_c_normed, k_pe]</span>
+</span></span><span style="display:flex;"><span>    ops<span style="color:#f92672">.</span>concat_and_cache_mla(
+</span></span><span style="display:flex;"><span>        kv_c_normed,
+</span></span><span style="display:flex;"><span>        k_pe<span style="color:#f92672">.</span>squeeze(<span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>        kv_cache,
+</span></span><span style="display:flex;"><span>        slot_mapping<span style="color:#f92672">.</span>flatten(),
+</span></span><span style="display:flex;"><span>        kv_cache_dtype<span style="color:#f92672">=</span>kv_cache_dtype,
+</span></span><span style="display:flex;"><span>        scale<span style="color:#f92672">=</span>k_scale,
+</span></span><span style="display:flex;"><span>    )
+</span></span></code></pre></div><h3 id="forward_impl把-batch-拆成-prefill-和-decode">
+    forward_impl：把 batch 拆成 prefill 和 decode<a class="hash-link" href="#forward_impl%e6%8a%8a-batch-%e6%8b%86%e6%88%90-prefill-%e5%92%8c-decode" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>fp8_attention <span style="color:#f92672">=</span> is_quantized_kv_cache(self<span style="color:#f92672">.</span>kv_cache_dtype)
+</span></span><span style="display:flex;"><span>num_actual_toks <span style="color:#f92672">=</span> attn_metadata<span style="color:#f92672">.</span>num_actual_tokens
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># CUDA graph 会 padding 输入输出，这里只截取真实 token。</span>
+</span></span><span style="display:flex;"><span>output <span style="color:#f92672">=</span> output[:num_actual_toks, <span style="color:#f92672">...</span>]
+</span></span><span style="display:flex;"><span>q <span style="color:#f92672">=</span> q[:num_actual_toks, <span style="color:#f92672">...</span>]
+</span></span><span style="display:flex;"><span>k_c_normed <span style="color:#f92672">=</span> k_c_normed[:num_actual_toks, <span style="color:#f92672">...</span>]
+</span></span><span style="display:flex;"><span>k_pe <span style="color:#f92672">=</span> k_pe[:num_actual_toks, <span style="color:#f92672">...</span>]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># sparse MLA backend 只支持 MQA/decode-style attention。</span>
+</span></span><span style="display:flex;"><span>is_sparse_impl <span style="color:#f92672">=</span> isinstance(self<span style="color:#f92672">.</span>impl, SparseMLAAttentionImpl)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> is_sparse_impl:
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># sparse 情况下所有 token 都走 MQA。</span>
+</span></span><span style="display:flex;"><span>    num_mqa_tokens <span style="color:#f92672">=</span> q<span style="color:#f92672">.</span>size(<span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>    num_mha_tokens <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 普通 MLA 由 metadata 告诉当前 batch 中多少 token 是 decode。</span>
+</span></span><span style="display:flex;"><span>    num_mqa_tokens <span style="color:#f92672">=</span> attn_metadata<span style="color:#f92672">.</span>num_decode_tokens
+</span></span><span style="display:flex;"><span>    num_mha_tokens <span style="color:#f92672">=</span> q<span style="color:#f92672">.</span>size(<span style="color:#ae81ff">0</span>) <span style="color:#f92672">-</span> num_mqa_tokens
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> num_mha_tokens <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># prefill 部分：compute-friendly MHA。</span>
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>impl<span style="color:#f92672">.</span>forward_mha(
+</span></span><span style="display:flex;"><span>        q[num_mqa_tokens:],
+</span></span><span style="display:flex;"><span>        k_c_normed[num_mqa_tokens:],
+</span></span><span style="display:flex;"><span>        k_pe[num_mqa_tokens:],
+</span></span><span style="display:flex;"><span>        kv_cache,
+</span></span><span style="display:flex;"><span>        attn_metadata,
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>_k_scale,
+</span></span><span style="display:flex;"><span>        output<span style="color:#f92672">=</span>output[num_mqa_tokens:],
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> num_mqa_tokens <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># decode 部分：data-movement-friendly MQA。</span>
+</span></span><span style="display:flex;"><span>    mqa_q <span style="color:#f92672">=</span> q[:num_mqa_tokens]
+</span></span><span style="display:flex;"><span>    mqa_output_slice <span style="color:#f92672">=</span> output[:num_mqa_tokens]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># q_nope: [B, heads, qk_nope_head_dim]</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># q_pe:   [B, heads, qk_rope_head_dim]</span>
+</span></span><span style="display:flex;"><span>    mqa_q_nope, mqa_q_pe <span style="color:#f92672">=</span> mqa_q<span style="color:#f92672">.</span>split(
+</span></span><span style="display:flex;"><span>        [self<span style="color:#f92672">.</span>qk_nope_head_dim, self<span style="color:#f92672">.</span>qk_rope_head_dim], dim<span style="color:#f92672">=-</span><span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 将 q_nope 投到 latent KV 空间：</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># [heads, B, P] x [heads, P, Lkv] -&gt; [heads, B, Lkv]</span>
+</span></span><span style="display:flex;"><span>    mqa_q_nope <span style="color:#f92672">=</span> mqa_q_nope<span style="color:#f92672">.</span>transpose(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>    torch<span style="color:#f92672">.</span>bmm(mqa_q_nope, self<span style="color:#f92672">.</span>W_UK_T, out<span style="color:#f92672">=</span>mqa_ql_nope)
+</span></span><span style="display:flex;"><span>    mqa_ql_nope <span style="color:#f92672">=</span> mqa_ql_nope<span style="color:#f92672">.</span>transpose(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># backend 的 MQA 输入是 latent query + rope query。</span>
+</span></span><span style="display:flex;"><span>    mqa_q <span style="color:#f92672">=</span> (mqa_ql_nope, mqa_q_pe)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># backend 从 paged latent KV cache 中读取历史 KV。</span>
+</span></span><span style="display:flex;"><span>    attn_out, lse <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>impl<span style="color:#f92672">.</span>forward_mqa(mqa_q, kv_cache, attn_metadata, self)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># MQA 输出仍在 latent value 空间，需要通过 W_UV 投回 v_head_dim。</span>
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>_v_up_proj(attn_out, out<span style="color:#f92672">=</span>mqa_output_slice)
+</span></span></code></pre></div><ul>
+<li>Prefill token 多，$S_q/S_{kv}$ 比例更接近 1，展开 K/V 做 MHA 更划算。</li>
+<li>Decode token 少，主要瓶颈是读历史 KV cache，所以直接在 latent cache 上做 MQA 更省带宽。</li>
+</ul>
+<h3 id="prefill-mha当前-token-与历史-context-分开算">
+    Prefill MHA：当前 token 与历史 context 分开算<a class="hash-link" href="#prefill-mha%e5%bd%93%e5%89%8d-token-%e4%b8%8e%e5%8e%86%e5%8f%b2-context-%e5%88%86%e5%bc%80%e7%ae%97" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward_mha</span>(self, q, kv_c_normed, k_pe, kv_cache, attn_metadata, k_scale, output):
+</span></span><span style="display:flex;"><span>    prefill_metadata <span style="color:#f92672">=</span> attn_metadata<span style="color:#f92672">.</span>prefill
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 当前 prefill chunk 的新 token，需要从 latent KV 展开出 k_nope 和 v。</span>
+</span></span><span style="display:flex;"><span>    kv_nope <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>kv_b_proj(kv_c_normed)[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>view(
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>,
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>num_heads,
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>qk_nope_head_dim <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>v_head_dim,
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>    k_nope, v <span style="color:#f92672">=</span> kv_nope<span style="color:#f92672">.</span>split([self<span style="color:#f92672">.</span>qk_nope_head_dim, self<span style="color:#f92672">.</span>v_head_dim], dim<span style="color:#f92672">=-</span><span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 完整 K = [k_nope, k_pe]。</span>
+</span></span><span style="display:flex;"><span>    k <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>_concat_k_nope_k_pe(k_nope, k_pe)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 当前新 token 之间做 causal attention。</span>
+</span></span><span style="display:flex;"><span>    output_prefill <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>_run_prefill_new_tokens(
+</span></span><span style="display:flex;"><span>        prefill<span style="color:#f92672">=</span>prefill_metadata,
+</span></span><span style="display:flex;"><span>        q<span style="color:#f92672">=</span>q,
+</span></span><span style="display:flex;"><span>        k<span style="color:#f92672">=</span>k,
+</span></span><span style="display:flex;"><span>        v<span style="color:#f92672">=</span>v,
+</span></span><span style="display:flex;"><span>        return_softmax_lse<span style="color:#f92672">=</span>has_context,
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> has_context:
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># chunked prefill 有历史 context。</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 历史 context 已在 KV cache 中，不能直接用当前 kv_c_normed。</span>
+</span></span><span style="display:flex;"><span>        context_output, context_lse <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>_compute_prefill_context(
+</span></span><span style="display:flex;"><span>            q,
+</span></span><span style="display:flex;"><span>            kv_cache,
+</span></span><span style="display:flex;"><span>            attn_metadata,
+</span></span><span style="display:flex;"><span>            k_scale,
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 当前 suffix 和历史 context 是两次 attention，需要按 LSE 稳定合并。</span>
+</span></span><span style="display:flex;"><span>        merge_attn_states(
+</span></span><span style="display:flex;"><span>            output<span style="color:#f92672">=</span>output<span style="color:#f92672">.</span>view(<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>, self<span style="color:#f92672">.</span>num_heads, self<span style="color:#f92672">.</span>v_head_dim),
+</span></span><span style="display:flex;"><span>            prefix_output<span style="color:#f92672">=</span>context_output,
+</span></span><span style="display:flex;"><span>            prefix_lse<span style="color:#f92672">=</span>context_lse,
+</span></span><span style="display:flex;"><span>            suffix_output<span style="color:#f92672">=</span>suffix_output,
+</span></span><span style="display:flex;"><span>            suffix_lse<span style="color:#f92672">=</span>suffix_lse,
+</span></span><span style="display:flex;"><span>            prefill_tokens_with_context<span style="color:#f92672">=</span>(
+</span></span><span style="display:flex;"><span>                prefill_metadata<span style="color:#f92672">.</span>chunked_context<span style="color:#f92672">.</span>prefill_tokens_with_context
+</span></span><span style="display:flex;"><span>            ),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 没有历史 context，直接写输出。</span>
+</span></span><span style="display:flex;"><span>        output_prefill <span style="color:#f92672">=</span> output_prefill[<span style="color:#f92672">...</span>, : v<span style="color:#f92672">.</span>shape[<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>]]<span style="color:#f92672">.</span>flatten(start_dim<span style="color:#f92672">=-</span><span style="color:#ae81ff">2</span>)
+</span></span><span style="display:flex;"><span>        output<span style="color:#f92672">.</span>copy_(output_prefill)
+</span></span></code></pre></div><ul>
+<li>prefill 仍需要较多计算：历史 latent KV 省了 cache 空间，但参与 MHA 前必须上投影为普通 K/V。</li>
+</ul>
+<h3 id="decode-mqa直接在-latent-cache-上算">
+    Decode MQA：直接在 latent cache 上算<a class="hash-link" href="#decode-mqa%e7%9b%b4%e6%8e%a5%e5%9c%a8-latent-cache-%e4%b8%8a%e7%ae%97" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>这里以Triton实现为例，vllm/v1/attention/backends/mla/triton_mla.py</p>
+</blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward_mqa</span>(self, q, kv_c_and_k_pe_cache, attn_metadata, layer):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">assert</span> kv_c_and_k_pe_cache<span style="color:#f92672">.</span>numel() <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">assert</span> attn_metadata<span style="color:#f92672">.</span>decode <span style="color:#f92672">is</span> <span style="color:#f92672">not</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 通用层可能传入 tuple: (ql_nope, q_pe)。</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Triton backend 这里拼成完整 latent-space query。</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> type(q) <span style="color:#f92672">is</span> tuple:
+</span></span><span style="display:flex;"><span>        q <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>cat(q, dim<span style="color:#f92672">=-</span><span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    B <span style="color:#f92672">=</span> q<span style="color:#f92672">.</span>shape[<span style="color:#ae81ff">0</span>]
+</span></span><span style="display:flex;"><span>    q_num_heads <span style="color:#f92672">=</span> q<span style="color:#f92672">.</span>shape[<span style="color:#ae81ff">1</span>]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># decode attention 的输出不是 v_head_dim，而是 kv_lora_rank。</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 后续由通用层 _v_up_proj 投到 v_head_dim。</span>
+</span></span><span style="display:flex;"><span>    o <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>zeros(
+</span></span><span style="display:flex;"><span>        B,
+</span></span><span style="display:flex;"><span>        q_num_heads,
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>kv_lora_rank,
+</span></span><span style="display:flex;"><span>        dtype<span style="color:#f92672">=</span>q<span style="color:#f92672">.</span>dtype,
+</span></span><span style="display:flex;"><span>        device<span style="color:#f92672">=</span>q<span style="color:#f92672">.</span>device,
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 根据 max_seq_len 和 SM 数估计把 KV 分成几段并行处理。</span>
+</span></span><span style="display:flex;"><span>    ideal_splits <span style="color:#f92672">=</span> max(<span style="color:#ae81ff">1</span>, attn_metadata<span style="color:#f92672">.</span>max_seq_len <span style="color:#f92672">//</span> min_work_per_split)
+</span></span><span style="display:flex;"><span>    ideal_splits <span style="color:#f92672">=</span> triton<span style="color:#f92672">.</span>next_power_of_2(ideal_splits)
+</span></span><span style="display:flex;"><span>    num_kv_splits <span style="color:#f92672">=</span> min(ideal_splits, max_splits)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># cache 原始 shape 是 [num_blocks, block_size, Lkv + R]。</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 这里增加一个 head 维，方便复用 decode kernel 形态。</span>
+</span></span><span style="display:flex;"><span>    kv_c_and_k_pe_cache <span style="color:#f92672">=</span> kv_c_and_k_pe_cache<span style="color:#f92672">.</span>unsqueeze(<span style="color:#ae81ff">2</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># latent value 使用 kv_c 部分。</span>
+</span></span><span style="display:flex;"><span>    kv_c_cache <span style="color:#f92672">=</span> kv_c_and_k_pe_cache[<span style="color:#f92672">...</span>, : self<span style="color:#f92672">.</span>kv_lora_rank]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    decode_attention_fwd(
+</span></span><span style="display:flex;"><span>        q,
+</span></span><span style="display:flex;"><span>        kv_c_and_k_pe_cache,
+</span></span><span style="display:flex;"><span>        kv_c_cache,
+</span></span><span style="display:flex;"><span>        o,
+</span></span><span style="display:flex;"><span>        lse,
+</span></span><span style="display:flex;"><span>        attn_metadata<span style="color:#f92672">.</span>decode<span style="color:#f92672">.</span>block_table,
+</span></span><span style="display:flex;"><span>        attn_metadata<span style="color:#f92672">.</span>decode<span style="color:#f92672">.</span>seq_lens,
+</span></span><span style="display:flex;"><span>        attn_logits,
+</span></span><span style="display:flex;"><span>        num_kv_splits,
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>scale,
+</span></span><span style="display:flex;"><span>        PAGE_SIZE,
+</span></span><span style="display:flex;"><span>        k_scale<span style="color:#f92672">=</span>layer<span style="color:#f92672">.</span>_k_scale,
+</span></span><span style="display:flex;"><span>        v_scale<span style="color:#f92672">=</span>layer<span style="color:#f92672">.</span>_k_scale,
+</span></span><span style="display:flex;"><span>        is_mla<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>,
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> o, lse
+</span></span></code></pre></div><ul>
+<li>cache 不展开成 <code>[heads, qk_nope_head_dim]</code> 的 K。</li>
+<li>Q 的 nope 部分先乘 $W^{{UK}}$ 投到 latent 维。</li>
+<li>attention value 直接用 <code>kv_c_cache</code>。</li>
+<li>attention 输出是 latent value，再乘 $W^{UV}$。</li>
+</ul>
+<h3 id="kv-cache">
+    KV cache<a class="hash-link" href="#kv-cache" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_kv_cache_spec</span>(self, vllm_config):
+</span></span><span style="display:flex;"><span>    kv_cache_dtype <span style="color:#f92672">=</span> kv_cache_dtype_str_to_dtype(
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>kv_cache_dtype,
+</span></span><span style="display:flex;"><span>        vllm_config<span style="color:#f92672">.</span>model_config,
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> MLAAttentionSpec(
+</span></span><span style="display:flex;"><span>        block_size<span style="color:#f92672">=</span>vllm_config<span style="color:#f92672">.</span>cache_config<span style="color:#f92672">.</span>block_size,
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># MLA latent KV 是 MQA 风格，所以 KV head 固定为 1。</span>
+</span></span><span style="display:flex;"><span>        num_kv_heads<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>,
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 每个 token 存 [kv_c_normed, k_pe]。</span>
+</span></span><span style="display:flex;"><span>        head_size<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>head_size,
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        dtype<span style="color:#f92672">=</span>kv_cache_dtype,
+</span></span><span style="display:flex;"><span>        cache_dtype_str<span style="color:#f92672">=</span>vllm_config<span style="color:#f92672">.</span>cache_config<span style="color:#f92672">.</span>cache_dtype,
+</span></span><span style="display:flex;"><span>    )
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#a6e22e">@dataclass</span>(frozen<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>, kw_only<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>)
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MLAAttentionSpec</span>(FullAttentionSpec):
+</span></span><span style="display:flex;"><span>    cache_dtype_str: str <span style="color:#f92672">|</span> <span style="color:#66d9ef">None</span> <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">@property</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">real_page_size_bytes</span>(self) <span style="color:#f92672">-&gt;</span> int:
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>cache_dtype_str <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;fp8_ds_mla&#34;</span>:
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># DeepSeek/FlashMLA sparse 的特殊格式：</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># 每 token 固定 656 bytes。</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">return</span> self<span style="color:#f92672">.</span>block_size <span style="color:#f92672">*</span> <span style="color:#ae81ff">656</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 普通 MLA 页大小：</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># block_size * 1 * (kv_lora_rank + qk_rope_head_dim) * dtype_size。</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 注意这里没有传统 attention 的 K/V 两份乘 2。</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> (
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>block_size
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>num_kv_heads
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>head_size
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">*</span> get_dtype_size(self<span style="color:#f92672">.</span>dtype)
+</span></span><span style="display:flex;"><span>        )
+</span></span></code></pre></div><p>对比普通 full attention：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># FullAttentionSpec.real_page_size_bytes</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">return</span> (
+</span></span><span style="display:flex;"><span>    <span style="color:#ae81ff">2</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>block_size
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>num_kv_heads
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>head_size
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span> get_dtype_size(self<span style="color:#f92672">.</span>dtype)
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><p>MLA cache 省内存的直接原因就是少了传统 K/V 双缓存，并且没有按所有 attention heads 展开。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_kv_cache_shape</span>(
+</span></span><span style="display:flex;"><span>    num_blocks,
+</span></span><span style="display:flex;"><span>    block_size,
+</span></span><span style="display:flex;"><span>    num_kv_heads,  <span style="color:#75715e"># MLA 假设为 1。</span>
+</span></span><span style="display:flex;"><span>    head_size,
+</span></span><span style="display:flex;"><span>    cache_dtype_str<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;auto&#34;</span>,
+</span></span><span style="display:flex;"><span>):
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># MLA cache 逻辑 shape。</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 不是 [2, num_blocks, block_size, heads, head_dim]。</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> (num_blocks, block_size, head_size)
+</span></span></code></pre></div><p>典型 DeepSeek R1/V3：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-text" data-lang="text"><span style="display:flex;"><span>kv_cache.shape = [num_blocks, block_size, 576]
+</span></span><span style="display:flex;"><span>576 = 512 kv_lora_rank + 64 qk_rope_head_dim
+</span></span></code></pre></div><p>Sparse FlashMLA 的 <code>fp8_ds_mla</code> 特例：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> cache_dtype_str <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;fp8_ds_mla&#34;</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># DeepSeek 特化 packed cache 格式。</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> (num_blocks, block_size, <span style="color:#ae81ff">656</span>)
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> (num_blocks, block_size, head_size)
+</span></span></code></pre></div><h2 id="参考">
+    参考<a class="hash-link" href="#%e5%8f%82%e8%80%83" title="Direct link to heading">#</a>
+</h2><ol>
+<li><a href="https://arxiv.org/pdf/2405.04434">https://arxiv.org/pdf/2405.04434</a></li>
+<li><a href="https://arxiv.org/pdf/2412.19437">https://arxiv.org/pdf/2412.19437</a></li>
+<li><a href="https://zhuanlan.zhihu.com/p/16730036197">https://zhuanlan.zhihu.com/p/16730036197</a></li>
+<li><a href="https://spaces.ac.cn/archives/10091">https://spaces.ac.cn/archives/10091</a></li>
+<li><a href="https://github.com/CalvinXKY/InfraTech/tree/main/models/deepseek_v3">https://github.com/CalvinXKY/InfraTech/tree/main/models/deepseek_v3</a></li>
+<li><a href="https://github.com/vllm-project/vllm">https://github.com/vllm-project/vllm</a></li>
+</ol>
+
+      </div>
+    </div>
+  </article>
+</div>
+
+    </main>
+    <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
+      &copy;  Atomage's Blog  2022-2026 
+    </a>
+    <div>
+<div class="ananke-socials">
+  
+    
+    <a href="https://github.com/ZhongsJie" target="_blank" rel="noopener" class="github ananke-social-link link-transition stackoverflow link dib z-999 pt3 pt0-l mr1" title="GitHub link" aria-label="follow on GitHub——Opens in a new window">
+      
+        <span class="icon"><svg style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+</span>
+      
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;"/>
+</svg>
+</span></a>
+  
+</div>
+</div>
+    <a href="https://beian.miit.gov.cn/" class="link db f6 pa2 br3 bg-mid-gray white dim w4 tc"> 蜀ICP备2022025742号 </a>
+    
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
+      <script>
+        var doNotTrack = false;
+        if ( true ) {
+          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
+          var doNotTrack = (dnt == "1" || dnt == "yes");
+        }
+        if (!doNotTrack) {
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-HVT9CMYGB1');
+        }
+      </script>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script>
+renderMathInElement(document.body, {
+    delimiters: [
+        {left: "$$", right: "$$", display: true},
+        {left: "\\[", right: "\\]", display: true},
+        {left: "$", right: "$", display: false},
+        {left: "\\(", right: "\\)", display: false}
+    ],
+    throwOnError: false
+});
+</script>
+
+  </body>
+</html>

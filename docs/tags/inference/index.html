@@ -46,8 +46,8 @@
 
   <meta itemprop="name" content="Inference">
   <meta itemprop="description" content="分界">
-  <meta itemprop="datePublished" content="2026-05-26T09:50:58+08:00">
-  <meta itemprop="dateModified" content="2026-05-26T09:50:58+08:00">
+  <meta itemprop="datePublished" content="2026-06-08T23:39:17+08:00">
+  <meta itemprop="dateModified" content="2026-06-08T23:39:17+08:00">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Inference">
   <meta name="twitter:description" content="分界">
@@ -192,6 +192,51 @@ pre code {
   </article>
   <div class="mw8 center">
     <section class="flex-ns flex-wrap justify-around mt5">
+      
+        <div class="relative w-100  mb4 bg-white">
+          <div class="relative w-100 mb4 bg-white nested-copy-line-height">
+  <div class="bg-white mb3 pa4 gray overflow-hidden">
+    <span class="f6 db">📎Posts</span>
+    <h1 class="f3 near-black">
+      <a href="../../posts/2026-06-08-mla-attention/" class="link black dim">
+        MLA(Multi-Head Latent Attention)
+      </a>
+    </h1>
+    <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
+      <p><img src="../../images/2026-06/Pasted%20image%2020260608085830.png" alt=""></p>
+<h2 id="mha多头注意力">
+    MHA（多头注意力）<a class="hash-link" href="#mha%e5%a4%9a%e5%a4%b4%e6%b3%a8%e6%84%8f%e5%8a%9b" title="Direct link to heading">#</a>
+</h2>$$Attention(Q, K, V) = softmax(Q·K^T / \sqrt{d_h}) · V$$<p>
+</p>
+$$q_t = W^Q h_t$$<p>
+</p>
+$$k_t = W^K h_t$$<p>
+</p>
+$$v_t = W^V h_t$$<ul>
+<li>$d$: Embedding维度；</li>
+<li>$d_h$：每一个头的维度；</li>
+<li>$n_h$: Attention头数；</li>
+<li>$h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入；</li>
+<li>$W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ；</li>
+<li>$q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ；
+$$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$
+$$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$
+$$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$
+$$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$
+$$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$</li>
+<li>$q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头；</li>
+<li>$W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵；</li>
+<li>每个 token 单层需要缓存的 cache 的是 $n_h$ 套 ($k,v$) — 共 $2n_hd_h$</li>
+</ul>
+<h2 id="mqa多查询注意力">
+    MQA（多查询注意力）<a class="hash-link" href="#mqa%e5%a4%9a%e6%9f%a5%e8%af%a2%e6%b3%a8%e6%84%8f%e5%8a%9b" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>所有 $n_h$ 个 Q head 共享同一套 K、V，只剩 1 套，更快的推理速度：由于内存和缓存需求大幅下降，内存带宽开销也基本消除。虽然训练效率基本保持不变，但与 MHA 相比，共享 K/V 对可能会导致模型质量和输出精度略有下降</p>
+    </div>
+  </div>
+</div>
+
+        </div>
       
         <div class="relative w-100  mb4 bg-white">
           <div class="relative w-100 mb4 bg-white nested-copy-line-height">
@@ -577,7 +622,9 @@ pre code {
 renderMathInElement(document.body, {
     delimiters: [
         {left: "$$", right: "$$", display: true},
-        {left: "$", right: "$", display: false}
+        {left: "\\[", right: "\\]", display: true},
+        {left: "$", right: "$", display: false},
+        {left: "\\(", right: "\\)", display: false}
     ],
     throwOnError: false
 });

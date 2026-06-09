@@ -88,7 +88,117 @@ Read the newly created Hugo file, then:
 
 3. Replace the content after frontmatter with the converted Obsidian content
 
-### Step 6: Save and Report
+### Step 6: Post-process LaTeX Formulas
+
+After writing the Hugo post content, clean up LaTeX display math blocks to avoid Goldmark parsing conflicts:
+
+**1. Remove blank lines inside `$$` blocks**
+
+Goldmark's passthrough extension treats blank lines as paragraph breaks, which ends the passthrough block prematurely. Remove all empty/blank lines between opening `$$` and closing `$$`:
+
+~~~
+# BEFORE (broken):
+$$
+\begin{aligned}
+\mathbf{c}_t^Q &= W^{DQ}\mathbf{h}_t, \\[4pt]
+
+[\mathbf{q}_{t,1}^C;\cdots] &= \mathbf{q}_t^C
+\end{aligned}
+$$
+
+# AFTER (fixed):
+$$
+\begin{aligned}
+\mathbf{c}_t^Q &= W^{DQ}\mathbf{h}_t, \\[4pt]
+[\mathbf{q}_{t,1}^C;\cdots] &= \mathbf{q}_t^C
+\end{aligned}
+$$
+~~~
+
+**2. Prevent standalone `=` on its own line**
+
+A single `=` on its own line inside a `$$` block triggers Goldmark's Setext heading parser — the text above becomes an `<h1>`. Join `=` with the next line:
+
+~~~
+# BEFORE (broken):
+$$
+\operatorname{head}_{(i)}
+=
+\operatorname{softmax}(...)
+$$
+
+# AFTER (fixed):
+$$
+\operatorname{head}_{(i)}
+= \operatorname{softmax}(...)
+$$
+~~~
+
+Note: `\begin{aligned}` blocks using `&=` are safe — the `&` prefix prevents Setext detection.
+
+**3. Add space between consecutive `$$` blocks**
+
+When the closing `$$` of one block is immediately followed by the opening `$$` of the next block, HTML whitespace collapse produces `$$$$`, which KaTeX misparses as an empty open-close pair. Add a `<!-- -->` comment or extra blank line between them to force DOM separation:
+
+~~~
+# BEFORE (broken):
+$$
+q_{t,i} = W_i^Q · h_t, \quad k_t = W^K h_t
+$$
+$$
+\operatorname{head}_{(i)} = \operatorname{softmax}(...)
+$$
+
+# AFTER (fixed):
+$$
+q_{t,i} = W_i^Q · h_t, \quad k_t = W^K h_t
+$$
+
+<!-- -->
+
+$$
+\operatorname{head}_{(i)} = \operatorname{softmax}(...)
+$$
+~~~
+
+**4. Verify KaTeX auto-render config**
+
+Ensure `layouts/partials/site-footer.html` includes all delimiter types:
+
+```javascript
+renderMathInElement(document.body, {
+    delimiters: [
+        {left: "$$", right: "$$", display: true},
+        {left: "\\[", right: "\\]", display: true},
+        {left: "$", right: "$", display: false},
+        {left: "\\(", right: "\\)", display: false}
+    ],
+    throwOnError: false
+});
+```
+
+**5. Prerequisite Hugo config**
+
+Ensure `config.yaml` has passthrough extension and `unsafe` renderer:
+
+```yaml
+markup:
+  goldmark:
+    renderer:
+      unsafe: true
+    extensions:
+      passthrough:
+        delimiters:
+          block:
+            - ['$$', '$$']
+            - ['\[', '\]']
+          inline:
+            - ['$', '$']
+            - ['\(', '\)']
+        enable: true
+```
+
+### Step 7: Save and Report
 
 Report to the user:
 - Source file location
@@ -97,7 +207,7 @@ Report to the user:
 - List of internal links converted
 - Any warnings or notes about unconverted elements
 
-### Step 7: Start Hugo Server
+### Step 8: Start Hugo Server
 
 Run the Hugo development server to preview the blog:
 
@@ -122,5 +232,5 @@ Run this in the background so the user can view the blog at `http://localhost:13
 - **No images**: Skip image processing steps
 - **External links**: Leave unchanged (they work in Hugo)
 - **Code blocks**: Leave unchanged
-- **Math/LaTeX**: Leave unchanged (Hugo may need MathJax/KaTeX configuration)
+- **Math/LaTeX**: Requires post-processing (see Step 6). Blank lines, standalone `=`, and consecutive `$$` blocks all cause Goldmark/KaTeX rendering failures. `\begin{aligned}` with `&=` is safe.
 - **Dataview queries**: Warn user these won't work in Hugo

@@ -2,6 +2,36 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
+    <loc>https://blogs.atomage.cn/</loc>
+    <lastmod>2026-06-08T23:39:17+08:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
+    <loc>https://blogs.atomage.cn/tags/attention/</loc>
+    <lastmod>2026-06-08T23:39:17+08:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
+    <loc>https://blogs.atomage.cn/tags/deepseek/</loc>
+    <lastmod>2026-06-08T23:39:17+08:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
+    <loc>https://blogs.atomage.cn/tags/inference/</loc>
+    <lastmod>2026-06-08T23:39:17+08:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
+    <loc>https://blogs.atomage.cn/posts/2026-06-08-mla-attention/</loc>
+    <lastmod>2026-06-08T23:39:17+08:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
+    <loc>https://blogs.atomage.cn/tags/</loc>
+    <lastmod>2026-06-08T23:39:17+08:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url><url>
     <loc>https://blogs.atomage.cn/tags/ai/</loc>
     <lastmod>2026-05-26T09:50:58+08:00</lastmod>
     <changefreq>monthly</changefreq>
@@ -12,27 +42,12 @@
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
-    <loc>https://blogs.atomage.cn/</loc>
-    <lastmod>2026-05-26T09:50:58+08:00</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url><url>
-    <loc>https://blogs.atomage.cn/tags/inference/</loc>
-    <lastmod>2026-05-26T09:50:58+08:00</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url><url>
     <loc>https://blogs.atomage.cn/tags/kernel/</loc>
     <lastmod>2026-05-26T09:50:58+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url><url>
     <loc>https://blogs.atomage.cn/posts/2026-05-26-split-qkv-rmsnorm-rope-fusion/</loc>
-    <lastmod>2026-05-26T09:50:58+08:00</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url><url>
-    <loc>https://blogs.atomage.cn/tags/</loc>
     <lastmod>2026-05-26T09:50:58+08:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
