@@ -1,19 +1,31 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
-  <channel>
-    <title>Attention on Atomage&#39;s Blog</title>
-    <link>https://blogs.atomage.cn/tags/attention/</link>
-    <description>Recent content in Attention on Atomage&#39;s Blog</description>
-    <generator>Hugo</generator>
-    <language>zh-cn</language>
-    <lastBuildDate>Mon, 08 Jun 2026 23:39:17 +0800</lastBuildDate>
-    <atom:link href="https://blogs.atomage.cn/tags/attention/index.xml" rel="self" type="application/rss+xml" />
-    <item>
-      <title>MLA(Multi-Head Latent Attention)</title>
-      <link>https://blogs.atomage.cn/posts/2026-06-08-mla-attention/</link>
-      <pubDate>Mon, 08 Jun 2026 23:39:17 +0800</pubDate>
-      <guid>https://blogs.atomage.cn/posts/2026-06-08-mla-attention/</guid>
-      <description>&lt;p&gt;&lt;img src=&#34;../../images/2026-06/Pasted%20image%2020260608085830.png&#34; alt=&#34;&#34;&gt;&lt;/p&gt;&#xA;&lt;h2 id=&#34;mha多头注意力&#34;&gt;&#xA;    MHA（多头注意力）&lt;a class=&#34;hash-link&#34; href=&#34;#mha%e5%a4%9a%e5%a4%b4%e6%b3%a8%e6%84%8f%e5%8a%9b&#34; title=&#34;Direct link to heading&#34;&gt;#&lt;/a&gt;&#xA;&lt;/h2&gt;$$Attention(Q, K, V) = softmax(Q·K^T / \sqrt{d_h}) · V$$&lt;p&gt;&#xA;&lt;/p&gt;&#xA;$$q_t = W^Q h_t$$&lt;p&gt;&#xA;&lt;/p&gt;&#xA;$$k_t = W^K h_t$$&lt;p&gt;&#xA;&lt;/p&gt;&#xA;$$v_t = W^V h_t$$&lt;ul&gt;&#xA;&lt;li&gt;$d$: Embedding维度；&lt;/li&gt;&#xA;&lt;li&gt;$d_h$：每一个头的维度；&lt;/li&gt;&#xA;&lt;li&gt;$n_h$: Attention头数；&lt;/li&gt;&#xA;&lt;li&gt;$h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入；&lt;/li&gt;&#xA;&lt;li&gt;$W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ；&lt;/li&gt;&#xA;&lt;li&gt;$q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ；&#xA;$$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$&#xA;$$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$&#xA;$$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$&#xA;$$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$&#xA;$$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$&lt;/li&gt;&#xA;&lt;li&gt;$q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头；&lt;/li&gt;&#xA;&lt;li&gt;$W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵；&lt;/li&gt;&#xA;&lt;li&gt;每个 token 单层需要缓存的 cache 的是 $n_h$ 套 ($k,v$) — 共 $2n_hd_h$&lt;/li&gt;&#xA;&lt;/ul&gt;&#xA;&lt;h2 id=&#34;mqa多查询注意力&#34;&gt;&#xA;    MQA（多查询注意力）&lt;a class=&#34;hash-link&#34; href=&#34;#mqa%e5%a4%9a%e6%9f%a5%e8%af%a2%e6%b3%a8%e6%84%8f%e5%8a%9b&#34; title=&#34;Direct link to heading&#34;&gt;#&lt;/a&gt;&#xA;&lt;/h2&gt;&lt;blockquote&gt;&#xA;&lt;p&gt;所有 $n_h$ 个 Q head 共享同一套 K、V，只剩 1 套，更快的推理速度：由于内存和缓存需求大幅下降，内存带宽开销也基本消除。虽然训练效率基本保持不变，但与 MHA 相比，共享 K/V 对可能会导致模型质量和输出精度略有下降&lt;/p&gt;</description>
-    </item>
-  </channel>
+	<channel>
+		<title>Attention on Atomage&#39;s Blog</title>
+		<link>http://localhost:1313/tags/attention/</link>
+		<description>Recent content in Attention on Atomage&#39;s Blog</description>
+		<generator>Hugo</generator>
+		<language>zh-cn</language>
+		
+		
+		
+		
+			<lastBuildDate>Tue, 16 Jun 2026 10:10:40 +0800</lastBuildDate>
+		
+			<atom:link href="http://localhost:1313/tags/attention/index.xml" rel="self" type="application/rss+xml" />
+			<item>
+				<title>DSA(Deepseek Sparse Attention)</title>
+				<link>http://localhost:1313/posts/2026-06-16-dsa-deepseek-sparse-attention/</link>
+				<pubDate>Tue, 16 Jun 2026 10:10:40 +0800</pubDate>
+				<guid>http://localhost:1313/posts/2026-06-16-dsa-deepseek-sparse-attention/</guid>
+				<description>&lt;h2 id=&#34;稀疏注意力&#34;&gt;&#xA;    稀疏注意力&lt;a class=&#34;hash-link&#34; href=&#34;#%e7%a8%80%e7%96%8f%e6%b3%a8%e6%84%8f%e5%8a%9b&#34; title=&#34;Direct link to heading&#34;&gt;#&lt;/a&gt;&#xA;&lt;/h2&gt;&lt;h3 id=&#34;复杂度瓶颈&#34;&gt;&#xA;    复杂度瓶颈&lt;a class=&#34;hash-link&#34; href=&#34;#%e5%a4%8d%e6%9d%82%e5%ba%a6%e7%93%b6%e9%a2%88&#34; title=&#34;Direct link to heading&#34;&gt;#&lt;/a&gt;&#xA;&lt;/h3&gt;&lt;p&gt;Transformer 架构的核心是缩放点积注意力 (Scaled Dot-Product Attention)：&lt;/p&gt;&#xA;$$o_i = \sum_{j=1}^{n} \alpha_{ij} \cdot v_j, \quad \alpha_{ij} = \operatorname{softmax}\left(\frac{q_i^T k_j}{\sqrt{d_k}}\right)_j$$&lt;p&gt;其中 $Q, K, V \in \mathbb{R}^{n \times d}$ 分别是查询、键、值矩阵。&lt;/p&gt;&#xA;&lt;p&gt;$QK^T$ 矩阵的形状为 $n \times n$，计算复杂度 $O(n^2 d)$，空间复杂度 $O(n^2)$。对于长序列（$n=128\text{K}$，$d=4096$，FP16），仅注意力矩阵就需要 $128\text{K} \times 128\text{K} \times 2\text{B} \approx 32\text{ GB}$ 显存——单张 GPU 无法承受。&lt;/p&gt;&#xA;&lt;blockquote&gt;&#xA;&lt;p&gt;注意力矩阵的稀疏性来源于一个直觉观察：&lt;strong&gt;并非所有 token 对都同等重要&lt;/strong&gt;。大多数 token 对之间的注意力权重接近零，仅有少数 token 对承载了主要的信息交互。&lt;/p&gt;&#xA;&lt;/blockquote&gt;&#xA;&lt;p&gt;这种稀疏性有两层含义：&lt;/p&gt;&#xA;&lt;ul&gt;&#xA;&lt;li&gt;&lt;strong&gt;自然的局部性&lt;/strong&gt;：相邻 token 之间的依赖远强于远距离 token&lt;/li&gt;&#xA;&lt;li&gt;&lt;strong&gt;内容相关性&lt;/strong&gt;：语义相关的 token 即使距离远也需要交互&lt;/li&gt;&#xA;&lt;/ul&gt;&#xA;&lt;p&gt;稀疏注意力方法试图在信息完整性和计算效率之间寻找最优平衡。&#xA;&lt;img src=&#34;../../images/2026-06/Pasted%20image%2020260615100100.png&#34; alt=&#34;&#34;&gt;&lt;/p&gt;</description>
+			</item>
+			<item>
+				<title>MLA(Multi-Head Latent Attention)</title>
+				<link>http://localhost:1313/posts/2026-06-08-mla-attention/</link>
+				<pubDate>Mon, 08 Jun 2026 23:39:17 +0800</pubDate>
+				<guid>http://localhost:1313/posts/2026-06-08-mla-attention/</guid>
+				<description>&lt;p&gt;&lt;img src=&#34;../../images/2026-06/Pasted%20image%2020260608085830.png&#34; alt=&#34;&#34;&gt;&lt;/p&gt;&#xA;&lt;h2 id=&#34;mha多头注意力&#34;&gt;&#xA;    MHA（多头注意力）&lt;a class=&#34;hash-link&#34; href=&#34;#mha%e5%a4%9a%e5%a4%b4%e6%b3%a8%e6%84%8f%e5%8a%9b&#34; title=&#34;Direct link to heading&#34;&gt;#&lt;/a&gt;&#xA;&lt;/h2&gt;$$Attention(Q, K, V) = softmax(Q·K^T / \sqrt{d_h}) · V$$&lt;p&gt;&#xA;&lt;/p&gt;&#xA;$$q_t = W^Q h_t$$&lt;p&gt;&#xA;&lt;/p&gt;&#xA;$$k_t = W^K h_t$$&lt;p&gt;&#xA;&lt;/p&gt;&#xA;$$v_t = W^V h_t$$&lt;ul&gt;&#xA;&lt;li&gt;$d$: Embedding维度；&lt;/li&gt;&#xA;&lt;li&gt;$d_h$：每一个头的维度；&lt;/li&gt;&#xA;&lt;li&gt;$n_h$: Attention头数；&lt;/li&gt;&#xA;&lt;li&gt;$h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入；&lt;/li&gt;&#xA;&lt;li&gt;$W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ；&lt;/li&gt;&#xA;&lt;li&gt;$q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ；&#xA;&#xA;$$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$&#xA;&#xA;$$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$&#xA;&#xA;$$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$&#xA;&#xA;$$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$&#xA;&#xA;$$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$&lt;/li&gt;&#xA;&lt;li&gt;$q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头；&lt;/li&gt;&#xA;&lt;li&gt;$W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵；&lt;/li&gt;&#xA;&lt;li&gt;每个 token 单层需要缓存的 cache 的是 $n_h$ 套 ($k,v$) — 共 $2n_hd_h$&lt;/li&gt;&#xA;&lt;/ul&gt;&#xA;&lt;h2 id=&#34;mqa多查询注意力&#34;&gt;&#xA;    MQA（多查询注意力）&lt;a class=&#34;hash-link&#34; href=&#34;#mqa%e5%a4%9a%e6%9f%a5%e8%af%a2%e6%b3%a8%e6%84%8f%e5%8a%9b&#34; title=&#34;Direct link to heading&#34;&gt;#&lt;/a&gt;&#xA;&lt;/h2&gt;&lt;blockquote&gt;&#xA;&lt;p&gt;所有 $n_h$ 个 Q head 共享同一套 K、V，只剩 1 套，更快的推理速度：由于内存和缓存需求大幅下降，内存带宽开销也基本消除。虽然训练效率基本保持不变，但与 MHA 相比，共享 K/V 对可能会导致模型质量和输出精度略有下降&lt;/p&gt;</description>
+			</item>
+	</channel>
 </rss>

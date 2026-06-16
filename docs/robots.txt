@@ -1,3 +1,2 @@
 User-agent: *
-Allow: /
-Sitemap: https://blogs.atomage.cn/sitemap.xml
+Disallow: /

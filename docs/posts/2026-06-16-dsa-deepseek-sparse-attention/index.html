@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-cn"ZgotmplZ>
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    
+    <title>DSA(Deepseek Sparse Attention) | Atomage&#39;s Blog</title>
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="description" content="
+    稀疏注意力#
+
+    复杂度瓶颈#
+Transformer 架构的核心是缩放点积注意力 (Scaled Dot-Product Attention)：
+$$o_i = \sum_{j=1}^{n} \alpha_{ij} \cdot v_j, \quad \alpha_{ij} = \operatorname{softmax}\left(\frac{q_i^T k_j}{\sqrt{d_k}}\right)_j$$其中 $Q, K, V \in \mathbb{R}^{n \times d}$ 分别是查询、键、值矩阵。
+$QK^T$ 矩阵的形状为 $n \times n$，计算复杂度 $O(n^2 d)$，空间复杂度 $O(n^2)$。对于长序列（$n=128\text{K}$，$d=4096$，FP16），仅注意力矩阵就需要 $128\text{K} \times 128\text{K} \times 2\text{B} \approx 32\text{ GB}$ 显存——单张 GPU 无法承受。
+
+注意力矩阵的稀疏性来源于一个直觉观察：并非所有 token 对都同等重要。大多数 token 对之间的注意力权重接近零，仅有少数 token 对承载了主要的信息交互。
+
+这种稀疏性有两层含义：
+
+自然的局部性：相邻 token 之间的依赖远强于远距离 token
+内容相关性：语义相关的 token 即使距离远也需要交互
+
+稀疏注意力方法试图在信息完整性和计算效率之间寻找最优平衡。
+">
+    <meta name="generator" content="Hugo 0.163.0">
+    
+    
+    
+    
+      <meta name="robots" content="noindex, nofollow">
+    
+
+    
+<link rel="stylesheet" href="../../ananke/css/main.min.css" >
+
+
+
+    
+
+    
+    
+      
+<link rel="shortcut icon" href="../../images/logo.svg" type="image/x-icon" />
+
+
+    
+
+    
+    
+    <meta property="og:url" content="http://localhost:1313/posts/2026-06-16-dsa-deepseek-sparse-attention/">
+	<meta property="og:site_name" content="Atomage&#39;s Blog">
+	<meta property="og:title" content="DSA(Deepseek Sparse Attention)">
+	<meta property="og:description" content="稀疏注意力# 复杂度瓶颈# Transformer 架构的核心是缩放点积注意力 (Scaled Dot-Product Attention)：
+$$o_i = \sum_{j=1}^{n} \alpha_{ij} \cdot v_j, \quad \alpha_{ij} = \operatorname{softmax}\left(\frac{q_i^T k_j}{\sqrt{d_k}}\right)_j$$其中 $Q, K, V \in \mathbb{R}^{n \times d}$ 分别是查询、键、值矩阵。
+$QK^T$ 矩阵的形状为 $n \times n$，计算复杂度 $O(n^2 d)$，空间复杂度 $O(n^2)$。对于长序列（$n=128\text{K}$，$d=4096$，FP16），仅注意力矩阵就需要 $128\text{K} \times 128\text{K} \times 2\text{B} \approx 32\text{ GB}$ 显存——单张 GPU 无法承受。
+注意力矩阵的稀疏性来源于一个直觉观察：并非所有 token 对都同等重要。大多数 token 对之间的注意力权重接近零，仅有少数 token 对承载了主要的信息交互。
+这种稀疏性有两层含义：
+自然的局部性：相邻 token 之间的依赖远强于远距离 token 内容相关性：语义相关的 token 即使距离远也需要交互 稀疏注意力方法试图在信息完整性和计算效率之间寻找最优平衡。">
+	<meta property="og:locale" content="zh_cn">
+	<meta property="og:type" content="article">
+		<meta property="article:section" content="posts">
+		<meta property="article:published_time" content="2026-06-16T10:10:40+08:00">
+		<meta property="article:modified_time" content="2026-06-16T10:10:40+08:00">
+		<meta property="article:tag" content="Deepseek">
+		<meta property="article:tag" content="Attention">
+		<meta property="article:tag" content="Inference">
+		<meta property="article:tag" content="Ai">
+
+	<meta itemprop="name" content="DSA(Deepseek Sparse Attention)">
+	<meta itemprop="description" content="稀疏注意力# 复杂度瓶颈# Transformer 架构的核心是缩放点积注意力 (Scaled Dot-Product Attention)：
+$$o_i = \sum_{j=1}^{n} \alpha_{ij} \cdot v_j, \quad \alpha_{ij} = \operatorname{softmax}\left(\frac{q_i^T k_j}{\sqrt{d_k}}\right)_j$$其中 $Q, K, V \in \mathbb{R}^{n \times d}$ 分别是查询、键、值矩阵。
+$QK^T$ 矩阵的形状为 $n \times n$，计算复杂度 $O(n^2 d)$，空间复杂度 $O(n^2)$。对于长序列（$n=128\text{K}$，$d=4096$，FP16），仅注意力矩阵就需要 $128\text{K} \times 128\text{K} \times 2\text{B} \approx 32\text{ GB}$ 显存——单张 GPU 无法承受。
+注意力矩阵的稀疏性来源于一个直觉观察：并非所有 token 对都同等重要。大多数 token 对之间的注意力权重接近零，仅有少数 token 对承载了主要的信息交互。
+这种稀疏性有两层含义：
+自然的局部性：相邻 token 之间的依赖远强于远距离 token 内容相关性：语义相关的 token 即使距离远也需要交互 稀疏注意力方法试图在信息完整性和计算效率之间寻找最优平衡。">
+	<meta itemprop="datePublished" content="2026-06-16T10:10:40+08:00">
+	<meta itemprop="dateModified" content="2026-06-16T10:10:40+08:00">
+	<meta itemprop="wordCount" content="6158">
+	<meta itemprop="keywords" content="Deepseek,Attention,Inference,Ai">
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content="DSA(Deepseek Sparse Attention)">
+	<meta name="twitter:description" content="稀疏注意力# 复杂度瓶颈# Transformer 架构的核心是缩放点积注意力 (Scaled Dot-Product Attention)：
+$$o_i = \sum_{j=1}^{n} \alpha_{ij} \cdot v_j, \quad \alpha_{ij} = \operatorname{softmax}\left(\frac{q_i^T k_j}{\sqrt{d_k}}\right)_j$$其中 $Q, K, V \in \mathbb{R}^{n \times d}$ 分别是查询、键、值矩阵。
+$QK^T$ 矩阵的形状为 $n \times n$，计算复杂度 $O(n^2 d)$，空间复杂度 $O(n^2)$。对于长序列（$n=128\text{K}$，$d=4096$，FP16），仅注意力矩阵就需要 $128\text{K} \times 128\text{K} \times 2\text{B} \approx 32\text{ GB}$ 显存——单张 GPU 无法承受。
+注意力矩阵的稀疏性来源于一个直觉观察：并非所有 token 对都同等重要。大多数 token 对之间的注意力权重接近零，仅有少数 token 对承载了主要的信息交互。
+这种稀疏性有两层含义：
+自然的局部性：相邻 token 之间的依赖远强于远距离 token 内容相关性：语义相关的 token 即使距离远也需要交互 稀疏注意力方法试图在信息完整性和计算效率之间寻找最优平衡。">
+
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<style>
+.toc-sidebar {
+    position: sticky;
+    top: 2rem;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+}
+.toc-sidebar nav ul {
+    list-style: none;
+    padding-left: 0;
+}
+.toc-sidebar nav ul li {
+    margin-bottom: 0.35em;
+    line-height: 1.4;
+}
+.toc-sidebar nav ul li a {
+    color: #555;
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+.toc-sidebar nav ul li a:hover {
+    color: #000;
+}
+.toc-sidebar nav ul ul {
+    padding-left: 0.75em;
+}
+.toc-sidebar nav ul ul li a {
+    font-size: 0.8rem;
+    color: #777;
+}
+pre {
+    max-width: 100%;
+    box-sizing: border-box;
+    border-radius: 6px;
+}
+pre code {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+</style>
+
+  </head>
+
+  <body class="ma0 avenir bg-near-white">
+
+    
+
+  <header>
+    <div class="bg-black">
+      <nav class="pv3 ph3 ph4-ns" role="navigation">
+  <div class="flex-l justify-between items-center center">
+    <a href="../../" class="f3 fw2 hover-white no-underline white-90 dib">
+      
+        <img src="../../images/site-logo.svg" class="w100 mw5-ns" alt="Atomage&#39;s Blog" />
+      
+    </a>
+    <div class="flex-l items-center">
+      
+
+      
+        <ul class="pl0 mr3">
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="../../archives/" title="⏱️Archives page">
+              ⏱️Archives
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="../../posts/" title="📎Posts page">
+              📎Posts
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="../../about/" title="🙋🏻‍♂️About page">
+              🙋🏻‍♂️About
+            </a>
+          </li>
+          
+        </ul>
+      
+      
+<div class="ananke-socials">
+  
+    
+    <a href="https://github.com/ZhongsJie" target="_blank" rel="noopener" class="github ananke-social-link link-transition stackoverflow link dib z-999 pt3 pt0-l mr1" title="GitHub link" aria-label="follow on GitHub——Opens in a new window">
+      
+        <span class="icon"><svg style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+</span>
+      
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;"/>
+</svg>
+</span></a>
+  
+</div>
+
+    </div>
+  </div>
+</nav>
+
+    </div>
+  </header>
+
+
+    <main class="pb7" role="main">
+      
+
+<div class="flex-l mt2 mw9 center">
+  <article class="flex-l justify-between center ph3">
+    <aside class="w-20-l pr4-l dn db-l toc-sidebar">
+      
+      <div class="nested-list-reset nested-copy-line-height nested-links">
+        <p class="f5 b mb2 mt0">目录</p>
+        <nav id="TableOfContents">
+  <ul>
+    <li><a href="#稀疏注意力">稀疏注意力</a>
+      <ul>
+        <li><a href="#复杂度瓶颈">复杂度瓶颈</a></li>
+      </ul>
+    </li>
+    <li><a href="#固定pattern稀疏注意力">固定Pattern稀疏注意力</a>
+      <ul>
+        <li><a href="#滑动窗口注意力-sliding-window-attention-swa">滑动窗口注意力 (Sliding Window Attention, SWA)</a></li>
+        <li><a href="#全局局部混合注意力">全局+局部混合注意力</a></li>
+        <li><a href="#分块稀疏注意力-block-sparse-attention">分块稀疏注意力 (Block-Sparse Attention)</a></li>
+      </ul>
+    </li>
+    <li><a href="#native-sparse-attentionnsa">Native Sparse Attention(NSA)</a>
+      <ul>
+        <li><a href="#算法设计">算法设计</a></li>
+        <li><a href="#token-压缩">Token 压缩</a></li>
+        <li><a href="#top-n选择">Top-n选择</a></li>
+        <li><a href="#kernel实现">Kernel实现</a></li>
+      </ul>
+    </li>
+    <li><a href="#deepseek-sparse-attentiondsa">DeepSeek Sparse Attention(DSA)</a>
+      <ul>
+        <li><a href="#闪电索引器lightning-indexer">闪电索引器（Lightning Indexer）</a></li>
+        <li><a href="#top-k-selector">Top-K Selector</a></li>
+        <li><a href="#mla和dsa">MLA和DSA</a></li>
+      </ul>
+    </li>
+    <li><a href="#参考">参考</a></li>
+  </ul>
+</nav>
+      </div>
+      
+    </aside>
+
+    <div class="w-80-l">
+      <header class="mb4">
+        <p class="f6 b helvetica tracked mt0">
+          POSTS
+        </p>
+        <h1 class="f1 mt2 mb2">
+          DSA(Deepseek Sparse Attention)
+        </h1>
+        
+        <p class="tracked mt2 mb1">
+          By <strong>
+            
+            ZhongsJie
+            
+          </strong>
+        </p>
+        
+        <time class="f6 dib tracked" datetime="2026-06-16T10:10:40+08:00" >June 16, 2026</time>
+        
+        <span class="f6 dib tracked"> - 13 minutes read</span>
+        <span class="f6 dib tracked"> - 6158 words</span>
+        
+        <div class="mt2"><ul class="pa0">
+  
+   <li class="list di">
+     <a href="../../tags/deepseek/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">Deepseek</a>
+   </li>
+  
+   <li class="list di">
+     <a href="../../tags/attention/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">Attention</a>
+   </li>
+  
+   <li class="list di">
+     <a href="../../tags/inference/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">Inference</a>
+   </li>
+  
+   <li class="list di">
+     <a href="../../tags/ai/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">Ai</a>
+   </li>
+  
+</ul>
+</div>
+      </header>
+
+      <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray">
+        <h2 id="稀疏注意力">
+    稀疏注意力<a class="hash-link" href="#%e7%a8%80%e7%96%8f%e6%b3%a8%e6%84%8f%e5%8a%9b" title="Direct link to heading">#</a>
+</h2><h3 id="复杂度瓶颈">
+    复杂度瓶颈<a class="hash-link" href="#%e5%a4%8d%e6%9d%82%e5%ba%a6%e7%93%b6%e9%a2%88" title="Direct link to heading">#</a>
+</h3><p>Transformer 架构的核心是缩放点积注意力 (Scaled Dot-Product Attention)：</p>
+$$o_i = \sum_{j=1}^{n} \alpha_{ij} \cdot v_j, \quad \alpha_{ij} = \operatorname{softmax}\left(\frac{q_i^T k_j}{\sqrt{d_k}}\right)_j$$<p>其中 $Q, K, V \in \mathbb{R}^{n \times d}$ 分别是查询、键、值矩阵。</p>
+<p>$QK^T$ 矩阵的形状为 $n \times n$，计算复杂度 $O(n^2 d)$，空间复杂度 $O(n^2)$。对于长序列（$n=128\text{K}$，$d=4096$，FP16），仅注意力矩阵就需要 $128\text{K} \times 128\text{K} \times 2\text{B} \approx 32\text{ GB}$ 显存——单张 GPU 无法承受。</p>
+<blockquote>
+<p>注意力矩阵的稀疏性来源于一个直觉观察：<strong>并非所有 token 对都同等重要</strong>。大多数 token 对之间的注意力权重接近零，仅有少数 token 对承载了主要的信息交互。</p>
+</blockquote>
+<p>这种稀疏性有两层含义：</p>
+<ul>
+<li><strong>自然的局部性</strong>：相邻 token 之间的依赖远强于远距离 token</li>
+<li><strong>内容相关性</strong>：语义相关的 token 即使距离远也需要交互</li>
+</ul>
+<p>稀疏注意力方法试图在信息完整性和计算效率之间寻找最优平衡。
+<img src="../../images/2026-06/Pasted-image-20260615100100.png" alt=""></p>
+<p>稀疏注意力方法按核心策略可分为四大类：</p>
+<table>
+	<thead>
+			<tr>
+					<th>类别</th>
+					<th>核心思路</th>
+					<th>代表方法</th>
+					<th>复杂度</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><strong>固定Pattern稀疏</strong></td>
+					<td>预定义稀疏连接Pattern</td>
+					<td>Sparse Transformer, Longformer, BigBird, SWA</td>
+					<td>$O(n \cdot w)$ 或 $O(n\sqrt{n})$</td>
+			</tr>
+			<tr>
+					<td><strong>动态/可学习稀疏</strong></td>
+					<td>基于内容动态选择关注位置</td>
+					<td>Reformer, Routing Transformer, Sinkhorn</td>
+					<td>$O(n \log n) \sim O(n \cdot k)$</td>
+			</tr>
+			<tr>
+					<td><strong>低秩近似</strong></td>
+					<td>将注意力矩阵分解为低秩形式</td>
+					<td>Linformer, Nyströmformer</td>
+					<td>$O(n \cdot k)$</td>
+			</tr>
+			<tr>
+					<td><strong>核方法</strong></td>
+					<td>将 softmax 替换为可线性化的核函数</td>
+					<td>Performer, Linear Transformer, CosFormer</td>
+					<td>$O(n)$</td>
+			</tr>
+	</tbody>
+</table>
+<p>此外，<strong>硬件感知优化</strong>（FlashAttention 系列）虽不改变注意力计算结果，但通过 IO-aware tiling 实现了数倍的端到端加速，是所有高效注意力实现的工程基础。</p>
+<h2 id="固定pattern稀疏注意力">
+    固定Pattern稀疏注意力<a class="hash-link" href="#%e5%9b%ba%e5%ae%9apattern%e7%a8%80%e7%96%8f%e6%b3%a8%e6%84%8f%e5%8a%9b" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>固定Pattern稀疏注意力（Fixed Pattern Sparse Attention）通过预定义的稀疏掩膜Pattern降低计算量。稀疏掩码 $M$ 仅依赖于 token 的位置索引，与输入内容无关。</p>
+</blockquote>
+<p><img src="../../images/2026-06/Pasted-image-20260615101227.png" alt=""></p>
+<ul>
+<li>这些patterns可以独立使用，也可以组合使用（比如Longformer和Big Bird）</li>
+</ul>
+<h3 id="滑动窗口注意力-sliding-window-attention-swa">
+    滑动窗口注意力 (Sliding Window Attention, SWA)<a class="hash-link" href="#%e6%bb%91%e5%8a%a8%e7%aa%97%e5%8f%a3%e6%b3%a8%e6%84%8f%e5%8a%9b-sliding-window-attention-swa" title="Direct link to heading">#</a>
+</h3><p>[Sliding Window Attention（滑动窗口注意力）](../Sliding Window Attention/Sliding Window Attention（滑动窗口注意力）.md)</p>
+<p>每个 token 只关注其前后固定大小窗口 $w$ 内的 token：</p>
+$$M^{SW}_{ij} = \begin{cases} 0 & \text{if } |i - j| \leq w/2 \\ -\infty & \text{otherwise} \end{cases}$$<p>对于因果注意力（causal），窗口为单向：</p>
+$$o_i = \sum_{j=i-w+1}^{i} \alpha_{ij} \cdot v_j$$<h4 id="感受野层级堆叠的魔力">
+    感受野：层级堆叠的魔力<a class="hash-link" href="#%e6%84%9f%e5%8f%97%e9%87%8e%e5%b1%82%e7%ba%a7%e5%a0%86%e5%8f%a0%e7%9a%84%e9%ad%94%e5%8a%9b" title="Direct link to heading">#</a>
+</h4><p>SWA 最关键的洞察是：<strong>$L$ 层窗口为 $w$ 的 SWA 可实现 $L \times w$ 的有效感受野</strong>。第 $\ell$ 层的 token $i$ 可以间接访问第 $\ell-1$ 层的位置 $[i-w, i]$，第 $\ell-2$ 层的位置 $[i-2w, i]$，以此类推。Mistral-7B 使用 $w=4096$、$32$ 层 → 理论感受野 $131\text{,}072$ tokens，<strong>无需修改注意力机制本身</strong>。</p>
+<h4 id="复杂度分析">
+    复杂度分析<a class="hash-link" href="#%e5%a4%8d%e6%9d%82%e5%ba%a6%e5%88%86%e6%9e%90" title="Direct link to heading">#</a>
+</h4><table>
+	<thead>
+			<tr>
+					<th>指标</th>
+					<th>全注意力 ($n=128\text{K}$)</th>
+					<th>SWA ($w=4096$)</th>
+					<th>SWA ($w=1024$)</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>计算复杂度</td>
+					<td>$O(n^2 d)$</td>
+					<td>$O(n \cdot w \cdot d)$</td>
+					<td>$O(n \cdot w \cdot d)$</td>
+			</tr>
+			<tr>
+					<td>注意力矩阵内存</td>
+					<td>$O(n^2)$ ≈ 32 GB</td>
+					<td>$O(n \cdot w)$ ≈ 1 GB</td>
+					<td>$O(n \cdot w)$ ≈ 256 MB</td>
+			</tr>
+			<tr>
+					<td>32层 KV Cache</td>
+					<td>~32 GB</td>
+					<td>~1 GB</td>
+					<td>~256 MB</td>
+			</tr>
+	</tbody>
+</table>
+<h3 id="全局局部混合注意力">
+    全局+局部混合注意力<a class="hash-link" href="#%e5%85%a8%e5%b1%80%e5%b1%80%e9%83%a8%e6%b7%b7%e5%90%88%e6%b3%a8%e6%84%8f%e5%8a%9b" title="Direct link to heading">#</a>
+</h3><h4 id="longformer">
+    Longformer<a class="hash-link" href="#longformer" title="Direct link to heading">#</a>
+</h4><p><strong>滑动窗口+全局标记</strong>：Longformer 允许将部分特殊位置的 token 设为「全局 token」——它们关注所有 token，也被所有 token 关注：</p>
+<ul>
+<li><strong>CLS token</strong>: 分类任务需要全局信息</li>
+<li><strong>问句 token</strong>: QA 任务中问句 token 需看到全部文档</li>
+<li><strong>分隔符 token</strong>: 如 <code>[SEP]</code></li>
+</ul>
+<h3 id="分块稀疏注意力-block-sparse-attention">
+    分块稀疏注意力 (Block-Sparse Attention)<a class="hash-link" href="#%e5%88%86%e5%9d%97%e7%a8%80%e7%96%8f%e6%b3%a8%e6%84%8f%e5%8a%9b-block-sparse-attention" title="Direct link to heading">#</a>
+</h3><p>将序列分成大小为 $B$ 的块，每个 token 只关注同一块内的 token：</p>
+$$M^{\text{block}}_{ij} = \begin{cases} 0 & \text{if } \lfloor i/B \rfloor = \lfloor j/B \rfloor \\ -\infty & \text{otherwise} \end{cases}$$<p>Sparse Transformer 设计了两种互补的稀疏模式，在相邻层交替使用：</p>
+<ul>
+<li><strong>Strided 模式</strong>：按固定步长跨块连接</li>
+<li><strong>Fixed 模式</strong>：当前块 + 前一个块
+交替使用可以实现指数级感受野增长：$O(B \cdot 2^{L/2})$。全局 token 的计算复杂度为 $O(n \cdot g)$，其中 $g$ 为全局 token 数量（通常 $g \ll n$）。</li>
+</ul>
+<h2 id="native-sparse-attentionnsa">
+    Native Sparse Attention(NSA)<a class="hash-link" href="#native-sparse-attentionnsa" title="Direct link to heading">#</a>
+</h2><p>传统稀疏注意力方法存在两个根本问题:</p>
+<ol>
+<li><strong>推理时稀疏 (Post-hoc Sparsity)</strong>: 只在推理阶段通过启发式规则动态选择 token，但训练时仍用全注意力 → <strong>训练-推理不匹配</strong>；</li>
+<li><strong>硬件不友好</strong>: 动态稀疏模式 (如基于 Top-k 的动态选择) 在 GPU 上无法高效实现，不规则内存访问破坏 GPU 并行优势；</li>
+</ol>
+<p><img src="../../images/2026-06/Pasted-image-20260615112011.png" alt="">
+NSA 将注意力分解为三条<strong>并行互补</strong>的路径，在<strong>训练阶段就学习稀疏模式</strong> 并完成<strong>硬件对齐的 kernel</strong>。</p>
+<ul>
+<li><strong>压缩（Compress）</strong>：把输入值映射压缩到更少的序列值；这里先把token分块，上图是8个token分成一块，所以分了4块，此时就是$4*8*192$；最后一个是当前token，为了达到compress的目的，$8*192$通过MLP压缩到192，所以$4*8*192->4*192$，核心是把上文token的K按照每8个一组，压缩成192维：计算<strong>当前token（这里是第33个token）和前面分组后block的距离/相似度，这步的本质是粗步找到相似度高的token范围，相当于人的粗读、看目录和摘要</strong>；</li>
+<li><strong>选择（Selection）</strong>：选择top-n的tokens；一共4个block，当前token（第33个）与其中两个block的重要性高，得到$16*192$、也就是16个token的K向量，继续和当前token的q向量做乘法，得到$1*16$的向量，本质就是<strong>当前token和前面重要性高的token计算weight，相当于人精读重要内容</strong>；</li>
+<li><strong>滑窗（Sliding）</strong>：通过滑窗选取前面tokens；为了防止漏掉重要信息，当前token还要和前面上文token挨个做attention，这里选择的窗口还是6个token；</li>
+</ul>
+<p>三条路径分别捕捉不同类型的依赖</p>
+<table>
+	<thead>
+			<tr>
+					<th>路径</th>
+					<th>覆盖范围</th>
+					<th>粒度</th>
+					<th>作用</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Token Compression</td>
+					<td>全局 (压缩后)</td>
+					<td>粗粒度</td>
+					<td>捕捉远距离语义概要</td>
+			</tr>
+			<tr>
+					<td>Token Selection</td>
+					<td>全局 (选择性)</td>
+					<td>细粒度</td>
+					<td>保留长距离关键信息</td>
+			</tr>
+			<tr>
+					<td>Sliding Window</td>
+					<td>局部 (最近w个token)</td>
+					<td>细粒度</td>
+					<td>捕捉局部精确依赖</td>
+			</tr>
+	</tbody>
+</table>
+<p>计算量分析：<strong>第33个token要和前面32个token做attention计算，需要计算32次；如果使用了NSA算法，整个流程4+16+6=26次attention，一个token减少(32-16)/32=19%的计算量</strong>！context越长，计算量优化约明显。</p>
+<h3 id="算法设计">
+    算法设计<a class="hash-link" href="#%e7%ae%97%e6%b3%95%e8%ae%be%e8%ae%a1" title="Direct link to heading">#</a>
+</h3><p>为了充分利用具有自然稀疏模式的注意力潜力，对于每个查询 $q_t$，将中原始的键值对 $k_{:t}, v_{:t}$ 替换为一组更紧凑、信息密度更高的表示键值对 $\tilde{K}_t, \tilde{V}_t$。将优化后的注意力输出正式定义如下：
+</p>
+$$\tilde{K}_t = f_K(q_t, k_{:t}, v_{:t}), \quad \tilde{V}_t = f_V(q_t, k_{:t}, v_{:t})$$<p>
+</p>
+$$o_t^* = \mathrm{Attn}(q_t, \tilde{K}_t, \tilde{V}_t)$$<ul>
+<li>$\tilde{K}_t, \tilde{V}_t$ ：基于当前查询 $q_t$ 以及上下文记忆 $k_{:t}, v_{:t}$ 动态构造；</li>
+</ul>
+<p>可以设计多种映射策略，以获得不同类别的 $\tilde{K}_t^c, \tilde{V}_t^c$，并按如下方式进行组合：</p>
+$$o_t^* = \sum_{c \in C} g_t^c \cdot \mathrm{Attn}(q_t, \tilde{K}_t^c, \tilde{V}_t^c)$$<ul>
+<li>$C = \{\mathrm{cmp}, \mathrm{slc}, \mathrm{win}\}$： 三种映射策略，分别表示<strong>针对键和值的压缩、选择以及滑动窗口</strong>；</li>
+<li>$g_t^c \in [0, 1]$ ：对应策略 $c$ 的门控分数，由输入特征经过 MLP 和 sigmoid 激活函数得到；</li>
+<li>$N_t = \sum_{c \in C} \mathrm{size}[\tilde{K}_t^c]$：  $N_t$ 表示重映射后的键/值总数，可以通过确保 $N_t \ll t$ 来维持较高的稀疏率；</li>
+</ul>
+<h3 id="token-压缩">
+    Token 压缩<a class="hash-link" href="#token-%e5%8e%8b%e7%bc%a9" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>通过将连续的键或值块<strong>聚合为块级表示</strong>，可以得到压缩后的键和值，用于捕获整个块的信息。</p>
+</blockquote>
+$$\tilde{K}_t^{\mathrm{cmp}} = f_K^{\mathrm{cmp}}(k_{:t}) = \left\{ \varphi\left(k_{id+1:id+l}\right) \mid 0 \le i \le \left\lfloor \frac{t-l}{d} \right\rfloor \right\}$$<ul>
+<li>$l$ ：块长度；</li>
+<li>$d$ ：相邻块之间的滑动步长；</li>
+<li>$\varphi$ ：一个带有块内位置编码的可学习 MLP，用于<strong>将一个块中的键映射为单个压缩键</strong>；</li>
+<li>$\tilde{K}_t^{\mathrm{cmp}} \in \mathbb{R}^{d_k \times \left\lfloor \frac{t-l}{d} \right\rfloor}$ ：由压缩键组成的张量；</li>
+</ul>
+<p>通常，采用 $d < l$ 来<strong>缓解信息碎片化</strong>问题。类似的公式也适用于<strong>压缩值表示</strong> $\tilde{V}_t^{\mathrm{cmp}}$。压缩表示<strong>能够捕获更粗粒度、更高层次的语义信息</strong>，并降低注意力计算负担。</p>
+<h3 id="top-n选择">
+    Top-n选择<a class="hash-link" href="#top-n%e9%80%89%e6%8b%a9" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>仅使用压缩后的键和值可能会丢失重要的细粒度信息，因此需要有选择地保留单独的键和值。通过高效的 token 选择机制能够以较低的计算开销识别并保留最相关的 token。</p>
+</blockquote>
+<p><strong>块级选择（Blockwise Selection）</strong>：选择策略以空间连续块的形式处理键和值序列，这主要受到两个关键因素的驱动：</p>
+<ul>
+<li><strong>硬件效率考虑</strong>：现代 GPU 架构在<strong>连续块访问</strong>上通常具有显著更高的吞吐量。此外，块级计算能够更充分地利用 Tensor Core。使得块级内存访问和块级计算成为高性能注意力实现中的基本原则（例如FlashAttention）；</li>
+<li><strong>注意力分数固有的分布模式</strong> ：注意力分数通常表现出空间连续性，这意味着相邻的键往往具有相似的重要性水平，选整块比分 token 选更稳定；</li>
+</ul>
+<p>首先将键和值序列划分为选择块。通过为每个块分配<strong>重要性分数（Softmax后概率分布）</strong>，识别注意力计算中最重要的块。</p>
+<h4 id="重要性分数计算importance-score-computation">
+    重要性分数计算（Importance Score Computation）<a class="hash-link" href="#%e9%87%8d%e8%a6%81%e6%80%a7%e5%88%86%e6%95%b0%e8%ae%a1%e7%ae%97importance-score-computation" title="Direct link to heading">#</a>
+</h4><blockquote>
+<p>计算块级重要性分数可能会引入显著开销。但是Token压缩的注意力计算会产生中间注意力分数，可以利用这些分数来推导选择块的重要性分数.</p>
+</blockquote>
+$$p_t^{\mathrm{cmp}} = \mathrm{Softmax} \left( q_t^T \tilde{K}_t^{\mathrm{cmp}} \right)$$<ul>
+<li>$p_t^{\mathrm{cmp}} \in \mathbb{R}^{\left\lfloor \frac{t-l}{d} \right\rfloor + 1}$ : $q_t$ 与压缩键 $\tilde{K}_t^{\mathrm{cmp}}$ 之间的注意力分数；</li>
+</ul>
+$$p_t^{\mathrm{slc}} = p_t^{\mathrm{cmp}} \qquad \text{if }(l' = l = d)$$<p>
+</p>
+$$p_t^{\mathrm{slc}}[j] = \sum_{m=0}^{\frac{l'}{d}-1} \sum_{n=0}^{\frac{l}{d}-1} p_t^{\mathrm{cmp}} \left[ \frac{l'}{d}j - m - n \right] \qquad l \le l',d \mid l , d \mid l'$$<ul>
+<li>$l'$：表示选择块大小；</li>
+<li>$[\cdot]$ ：用于访问向量元素的索引操作符；</li>
+</ul>
+<p>当压缩块和选择块共享<strong>相同的分块方案，</strong> 即时，<strong>可以直接得到选择块的重要性分数</strong> $p_t^{\mathrm{slc}}$，对于<strong>分块方案不同</strong>的情况，可以根据块之间的空间关系推导选择块的重要性分数$p_t^{\mathrm{slc}}[j]$，其为<strong>所有「空间上与第</strong> $j$ <strong>个选择块有交集的压缩块」的</strong> $p^{cmp}$ 之和。</p>
+<p>对于采用 GQA 或 MQA 的模型，由于键值缓存会在多个查询头之间共享，因此必须确保这些查询头之间的块选择保持一致，以减少解码过程中 KV cache 的加载。一个<strong>组内跨头共享的重要性分数</strong>正式定义如下，该聚合方式确保同一组内不同头之间的块选择保持一致：
+</p>
+$$p_t^{\mathrm{slc}'} = \sum_{h=1}^{H} p_t^{\mathrm{slc},(h)}$$<ul>
+<li>$(h)$ : 头索引；</li>
+<li>$H$ ：每个组中的查询头数量</li>
+</ul>
+<h4 id="top--块选择top--block-selection">
+    Top-$n$ 块选择（Top-$n$ Block Selection）<a class="hash-link" href="#top--%e5%9d%97%e9%80%89%e6%8b%a9top--block-selection" title="Direct link to heading">#</a>
+</h4><p>在获得选择块的重要性分数之后，保留按照块重要性分数排序后位于 top-$n$ 稀疏块中的 token，其形式如下：</p>
+$$\mathcal{I}_t = \left\{ i \mid \mathrm{rank} \left( p_t^{\mathrm{slc}'}[i] \right) \le n \right\}$$<p>
+</p>
+$$\tilde{K}_t^{\mathrm{slc}} = \mathrm{Cat} \left[ \left\{ k_{il' + 1 : (i+1)l'} \mid i \in \mathcal{I}_t \right\} \right]$$<ul>
+<li>$\mathrm{rank}(\cdot)$ ：按降序排列后的排名位置，$\mathrm{rank}=1$ 对应最高分；</li>
+<li>$\mathcal{I}_t$ ：被选中块的索引集合；</li>
+<li>$\mathrm{Cat}$ ：拼接操作；</li>
+<li>$\tilde{K}_t^{\mathrm{slc}} \in \mathbb{R}^{d_k \times nl'}$ ：由所选键组成的张量，也适用于细粒度的值表示 $\tilde{V}_t^{\mathrm{slc}}$；</li>
+</ul>
+<h3 id="kernel实现">
+    Kernel实现<a class="hash-link" href="#kernel%e5%ae%9e%e7%8e%b0" title="Direct link to heading">#</a>
+</h3><p>[Flash attention-大模型加速](../FlashAttention/Flash attention-大模型加速.md)</p>
+<p><img src="../../images/2026-06/Pasted-image-20260615152507.png" alt=""></p>
+<p>为了在训练和预填充（prefilling）阶段实现接近 FlashAttention 级别的加速，NSA实现了与硬件对齐的稀疏注意力 kernel。其中压缩注意力和滑动窗口注意力的计算可以较容易地与现有 FlashAttention-2 kernel 兼容：</p>
+<ul>
+<li>压缩分支：$K^{cmp}, V^{cmp}$ 本身就是一段连续的“压缩 token 序列”，对 query 来说就是一个较短的 dense context；</li>
+<li>sliding window：最近 w 个 token，本来就是一段局部窗口 full attention；</li>
+</ul>
+<p>所以，在 kernel 级别，这两条分支不需要特殊 sparse kernel，只要把“有效长度”换成压缩长度 / 窗口长度，直接跑 FlashAttention‑2 的 Triton 实现；这等价于在算子接口上“兼容 dense attention 的调用方式”，避免多套实现。</p>
+<p>真正需要额外兼容逻辑的是<strong>selection</strong> <strong>分支</strong>，因为它要做 block 稀疏选择，而且要适配 GQA/MQA。如果直接沿用 FlashAttention 的策略，将时间上连续的 query 块加载到 SRAM 中，那么由于同一个 query 块内的不同 query 可能需要访问互不相交的 KV 块，会导致低效的内存访问。 因此采用不同的 query 分组策略：对于 query 序列中的每一个位置，可以<strong>将同一个 GQA 组内的所有 query heads 加载到 SRAM 中</strong>，因为它们共享相同的稀疏 KV 块，所谓的<strong>Hardware-Aligned，本质就是对selection模块做定制化处理</strong>：</p>
+<ul>
+<li><strong>以组为中心的数据加载</strong>： 对于每个内层循环，加载位置 $t$ 上同一组内所有 head 的 query：$Q \in \mathbb{R}^{h,d_k}$以及它们共享的稀疏 key/value 块索引 $\mathcal{I}_t$；</li>
+<li><strong>共享 KV 获取</strong>  ：在内层循环中，按照 $\mathcal{I}_t$ 索引顺序地将连续的 key/value 块加载到 SRAM 中，以最小化内存加载开销$K \in \mathbb{R}^{B_k,d_k}, \quad V \in \mathbb{R}^{B_k,d_v},\quad B_k \mid l'$ 其中，$B_k$ 是 kernel 块大小   ；</li>
+<li><strong>网格上的外层循环</strong>  ：将 query/output 循环放入 Triton 的 grid scheduler 中，以简化并优化 kernel；</li>
+</ul>
+<p>通过组内共享消除冗余的 KV 传输， 并且在 GPU 流式多处理器之间平衡计算负载。</p>
+<h2 id="deepseek-sparse-attentiondsa">
+    DeepSeek Sparse Attention(DSA)<a class="hash-link" href="#deepseek-sparse-attentiondsa" title="Direct link to heading">#</a>
+</h2><p><img src="../../images/2026-06/Pasted-image-20260615154409.png" alt="">
+DSA额外引入两个模块：</p>
+<ul>
+<li><strong>Lightning Indexer</strong>：计算出每个Q值与历史的所有K/V值的重要性分数，得到一个<strong>分数排序</strong>；</li>
+<li><strong>Top-K Selector</strong>：选出分数最高的$k$个K/V进行注意力计算，实现<strong>稀疏Attention</strong>；</li>
+</ul>
+<h3 id="闪电索引器lightning-indexer">
+    闪电索引器（Lightning Indexer）<a class="hash-link" href="#%e9%97%aa%e7%94%b5%e7%b4%a2%e5%bc%95%e5%99%a8lightning-indexer" title="Direct link to heading">#</a>
+</h3><p><strong>闪电索引器</strong>计算查询 token $h_t \in \mathbb{R}^d$ 与前序 token $h_s \in \mathbb{R}^d$ 之间的索引分数 $I_{t,s}$，用多个轻量 query-key 相似度探针，对每个历史 token 做相关性投票，然后加权融合成一个 top-k 排名分数：
+</p>
+$$I_{t,s} = \sum_{j=1}^{H^I} w_{t,j}^I \cdot \mathrm{ReLU} \left( q_{t,j}^I \cdot k_s^I \right)$$<ul>
+<li>$t$：当前 query token 的位置；</li>
+<li>$s$： 某个历史 token 的位置，且 $s < t$；</li>
+<li>$I_{t,s}$：当前 token $t$ 对历史 token $s$ 的重要性分数；</li>
+<li>$H^I$ ：表示索引器 head 的数量；</li>
+<li>$q_{t,j}^I \in \mathbb{R}^{d^I}$ ：从当前 token $h_t$ 投影出来的第 $j$ 个 indexer query；</li>
+<li>$w_{t,j}^I \in \mathbb{R}$ ：当前 token 对第 $j$ 个 indexer head 的动态门控权重，用来融合多个 indexer head 的相关性分数；</li>
+<li>$k_s^I \in \mathbb{R}^{d^I}$ ：从历史 token $h_s$ 投影出来的 indexer key；</li>
+<li>$q^I_{t,j} \cdot k^I_s$：query 与历史 token 的相似度；</li>
+</ul>
+<p>整体思想和标准 attention 的核心思想非常接近：标准 attention 也是通过 query-key 相似度判断一个 token 是否该关注另一个 token。区别是 Lightning Indexer 只做 <strong>选择/排序</strong>，不做完整的 value 聚合。
+</p>
+$$q_{t,j}^I \cdot k_s^I \Rightarrow QK^T \Rightarrow 相关性分数$$<ul>
+<li><strong>维度更小</strong>  : $q^I$、$k^I$ 是专门用于 index 的轻量投影，不是完整 attention 的大维度 Q/K；</li>
+<li><strong>只打分，不聚合 V</strong>  ：它不输出上下文结果，只负责判断“哪些 token 值得被真正 attention”；</li>
+<li><strong>用 ReLU 而不是 softmax</strong>  ：ReLU 计算更便宜，而且负相关直接归零。DeepSeek 报告明确说<strong>选择 ReLU 是出于吞吐考虑</strong>，并且 indexer head 少、可用 FP8 实现，因此效率较高；</li>
+<li><strong>用 $w^I_{t,j}$ 做动态 head 融合</strong> ：不同 head 可能关注不同类型的关系，例如局部依赖、实体引用、代码变量、长程引用等。$w^I_{t,j}$ 让当前 token 动态决定哪些 head 的评分更重要，通过当前 token 对第 $j$ 个 indexer head 的融合权重获得；</li>
+</ul>
+<p>训练时，DeepSeek 在 dense warm-up 阶段中保留 dense attention，冻结其他参数，只训练 lightning indexer。把主 attention 的多头注意力分数按 head 求和，再沿序列维度做 L1 normalization，得到目标分布 $p_{t,:}$；然后用 KL divergence 让 indexer 的 $\mathrm{Softmax}(I_{t,:})$ 对齐这个目标分布：</p>
+$$\mathcal{L}^{I} = \sum_{t} D_{KL} \left( p_{t,:} \;\|\; \mathrm{Softmax}(I_{t,:}) \right)$$<ul>
+<li>$\mathcal{L}^{I}$：Lightning Indexer 的训练损失；</li>
+<li>$t$：当前 query token 的位置；</li>
+<li>$p_{t,:}$：由 dense attention 得到的目标注意力分布；</li>
+<li>$I_{t,:}$：Lightning Indexer 对所有历史 token 计算得到的重要性分数；</li>
+<li>$\mathrm{Softmax}(I_{t,:})$：将 index score 转换为概率分布；</li>
+<li>$D_{KL}(\cdot \| \cdot)$：KL 散度，用于衡量两个分布之间的差异。</li>
+</ul>
+<p>Sparse Training 阶段：主模型和 Indexer 都训练，indexer 的输入会从计算图里 detach，indexer 只由 indexer loss $\mathcal{L}^I$ 训练；主模型只由 language modeling loss 训练。</p>
+<h3 id="top-k-selector">
+    Top-K Selector<a class="hash-link" href="#top-k-selector" title="Direct link to heading">#</a>
+</h3><p><strong>细粒度 token 选择机制</strong>仅检索与 top-$k$ 索引分数对应的键值条目 $\{c_s\}$，通过在查询 token $h_t$ 与稀疏选择出的键值条目 $\{c_s\}$ 之间应用注意力机制，计算注意力输出 $u_t$：
+</p>
+$$u_t = \mathrm{Attn} \left( h_t, \left\{ c_s \mid I_{t,s} \in \mathrm{Top}\text{-}k(I_{t,:}) \right\} \right)$$<h3 id="mla和dsa">
+    MLA和DSA<a class="hash-link" href="#mla%e5%92%8cdsa" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p><strong>DeepSeek MLA + MoE</strong>: 低秩 KV 压缩 (MLA) 配合 MoE 路由，实现较高 KV Cache 压缩比，<strong>DeepSeek DSA</strong>: 实现稀疏注意力。MLA 和 DSA 是<strong>正交且互补</strong>的优化，分别解决不同维度的瓶颈</p>
+</blockquote>
+<ul>
+<li>MLA 提供压缩的 KV 表示，大幅减少缓存；</li>
+<li>DSA 在此压缩基础上进一步稀疏化注意力计算；</li>
+<li>两者结合实现 KV Cache 和计算量的双重降低；</li>
+</ul>
+<p>DeepSeek-V3 原本就采用 <strong>MLA：Multi-head Latent Attention</strong>。MLA 的核心作用是把传统 attention 里的 KV cache 压缩成更紧凑的 <strong>latent KV 表示</strong>，从而降低推理时 KV cache 的显存占用。DeepSeek-V3 技术报告明确说，V3 采用 MLA 和 DeepSeekMoE 架构来提升推理和训练效率。</p>
+<p>DeepSeek-V3.2 在 V3.1-Terminus 基础上引入了 <strong>DSA：DeepSeek Sparse Attention</strong>。其主要由两个组件组成：<strong>Lightning Indexer</strong> 和 <strong>fine-grained token selection mechanism</strong>。</p>
+<h2 id="参考">
+    参考<a class="hash-link" href="#%e5%8f%82%e8%80%83" title="Direct link to heading">#</a>
+</h2><ol>
+<li><a href="https://zhuanlan.zhihu.com/p/1962162900111172920">https://zhuanlan.zhihu.com/p/1962162900111172920</a></li>
+<li><a href="https://arxiv.org/pdf/2004.05150">https://arxiv.org/pdf/2004.05150</a></li>
+<li><a href="https://arxiv.org/pdf/2502.11089">https://arxiv.org/pdf/2502.11089</a></li>
+<li><a href="https://arxiv.org/pdf/2512.02556">https://arxiv.org/pdf/2512.02556</a></li>
+<li><a href="https://github.com/deepseek-ai/DeepSeek-V3.2-Exp/blob/main/DeepSeek_V3_2.pdf">https://github.com/deepseek-ai/DeepSeek-V3.2-Exp/blob/main/DeepSeek_V3_2.pdf</a></li>
+<li><a href="https://www.cnblogs.com/theseventhson/p/18738724">https://www.cnblogs.com/theseventhson/p/18738724</a></li>
+<li><a href="https://vllm.ai/blog/2025-09-29-deepseek-v3-2">https://vllm.ai/blog/2025-09-29-deepseek-v3-2</a></li>
+</ol>
+
+      </div>
+    </div>
+  </article>
+</div>
+
+    </main>
+    <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
+      &copy;  Atomage's Blog  2022-2026 
+    </a>
+    <div>
+<div class="ananke-socials">
+  
+    
+    <a href="https://github.com/ZhongsJie" target="_blank" rel="noopener" class="github ananke-social-link link-transition stackoverflow link dib z-999 pt3 pt0-l mr1" title="GitHub link" aria-label="follow on GitHub——Opens in a new window">
+      
+        <span class="icon"><svg style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+</span>
+      
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;"/>
+</svg>
+</span></a>
+  
+</div>
+</div>
+    <a href="https://beian.miit.gov.cn/" class="link db f6 pa2 br3 bg-mid-gray white dim w4 tc"> 蜀ICP备2022025742号 </a>
+    
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
+      <script>
+        var doNotTrack = false;
+        if ( true ) {
+          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
+          var doNotTrack = (dnt == "1" || dnt == "yes");
+        }
+        if (!doNotTrack) {
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-HVT9CMYGB1');
+        }
+      </script>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script>
+renderMathInElement(document.body, {
+    delimiters: [
+        {left: "$$", right: "$$", display: true},
+        {left: "\\[", right: "\\]", display: true},
+        {left: "$", right: "$", display: false},
+        {left: "\\(", right: "\\)", display: false}
+    ],
+    throwOnError: false
+});
+</script>
+
+  </body>
+</html>

@@ -1,22 +1,22 @@
 <!DOCTYPE html>
-<html lang="zh-cn">
-  <head>
+<html lang="zh-cn"ZgotmplZ>
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
     <title>Atomage&#39;s Blog</title>
     <meta name="viewport" content="width=device-width,minimum-scale=1">
     <meta name="description" content="分界">
-    <meta name="generator" content="Hugo 0.154.5">
+    <meta name="generator" content="Hugo 0.163.0">
     
     
     
     
-      <meta name="robots" content="index, follow">
+      <meta name="robots" content="noindex, nofollow">
     
 
     
-<link rel="stylesheet" href="../../ananke/css/main.min.65a4ba9d742b05c115846d8e06cf4714294b7ebf3dd26b492a84a9e3cc66923d.css" >
+<link rel="stylesheet" href="../../ananke/css/main.min.css" >
 
 
 
@@ -37,37 +37,21 @@
       
     
     
-    <meta property="og:url" content="https://blogs.atomage.cn/categories/kubernetes/">
-  <meta property="og:site_name" content="Atomage&#39;s Blog">
-  <meta property="og:title" content="Kubernetes">
-  <meta property="og:description" content="分界">
-  <meta property="og:locale" content="zh_cn">
-  <meta property="og:type" content="website">
+    <meta property="og:url" content="http://localhost:1313/categories/kubernetes/">
+	<meta property="og:site_name" content="Atomage&#39;s Blog">
+	<meta property="og:title" content="Kubernetes">
+	<meta property="og:description" content="分界">
+	<meta property="og:locale" content="zh_cn">
+	<meta property="og:type" content="website">
 
-  <meta itemprop="name" content="Kubernetes">
-  <meta itemprop="description" content="分界">
-  <meta itemprop="datePublished" content="2022-12-27T22:37:43+08:00">
-  <meta itemprop="dateModified" content="2022-12-27T22:37:43+08:00">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Kubernetes">
-  <meta name="twitter:description" content="分界">
+	<meta itemprop="name" content="Kubernetes">
+	<meta itemprop="description" content="分界">
+	<meta itemprop="datePublished" content="2022-12-27T22:37:43+08:00">
+	<meta itemprop="dateModified" content="2022-12-27T22:37:43+08:00">
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content="Kubernetes">
+	<meta name="twitter:description" content="分界">
 
-      
-      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
-      <script>
-        var doNotTrack = false;
-        if ( true ) {
-          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
-          var doNotTrack = (dnt == "1" || dnt == "yes");
-        }
-        if (!doNotTrack) {
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-HVT9CMYGB1');
-        }
-      </script>
-    
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <style>
 .toc-sidebar {
@@ -112,7 +96,7 @@ pre code {
 
   </head>
 
-  <body class="ma0 avenir bg-near-white production">
+  <body class="ma0 avenir bg-near-white">
 
     
 
@@ -209,7 +193,7 @@ pre code {
 <p>主要功能将Pod状态信息同步到ApiServer，并不会主动监控Pod状态，提供接口供其他Manager调用，当其他组件需要改变 pod 的状态时会将 pod 的 status 信息发送到 statusManager 进行同步。主要使用方<code>probeManager</code>，<code>podWorkers</code></p>
 </blockquote>
 <p><img src="../../images/2022-12/image-StatusManager.png" alt="StatusManager"></p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">manager</span> <span style="color:#66d9ef">struct</span> {  
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">manager</span> <span style="color:#66d9ef">struct</span> {  
 </span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">kubeClient</span> <span style="color:#a6e22e">clientset</span>.<span style="color:#a6e22e">Interface</span>  
 </span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">podManager</span> <span style="color:#a6e22e">kubepod</span>.<span style="color:#a6e22e">Manager</span>  
 </span></span><span style="display:flex;"><span>   <span style="color:#75715e">// Map from pod UID to sync status of the corresponding pod.  </span>
@@ -228,7 +212,7 @@ pre code {
 </span></span><span style="display:flex;"><span>}
 </span></span></code></pre></div><h2 id="start">
     Start<a class="hash-link" href="#start" title="Direct link to heading">#</a>
-</h2><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">// 设置定时触发，时间为10s</span>
+</h2><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">// 设置定时触发，时间为10s</span>
 </span></span><span style="display:flex;"><span><span style="color:#a6e22e">syncTicker</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">NewTicker</span>(<span style="color:#a6e22e">syncPeriod</span>).<span style="color:#a6e22e">C</span>
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#66d9ef">go</span> <span style="color:#a6e22e">wait</span>.<span style="color:#a6e22e">Forever</span>(<span style="color:#66d9ef">func</span>() {  
@@ -269,7 +253,7 @@ pre code {
 </ul>
 </li>
 </ol>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">m</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">manager</span>) <span style="color:#a6e22e">syncPod</span>(<span style="color:#a6e22e">uid</span> <span style="color:#a6e22e">types</span>.<span style="color:#a6e22e">UID</span>, <span style="color:#a6e22e">status</span> <span style="color:#a6e22e">versionedPodStatus</span>) {
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">m</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">manager</span>) <span style="color:#a6e22e">syncPod</span>(<span style="color:#a6e22e">uid</span> <span style="color:#a6e22e">types</span>.<span style="color:#a6e22e">UID</span>, <span style="color:#a6e22e">status</span> <span style="color:#a6e22e">versionedPodStatus</span>) {
 </span></span><span style="display:flex;"><span>	<span style="color:#75715e">// 判断是否需要同步状态，以及是否处于删除状态</span>
 </span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> !<span style="color:#a6e22e">m</span>.<span style="color:#a6e22e">needsUpdate</span>(<span style="color:#a6e22e">uid</span>, <span style="color:#a6e22e">status</span>) {
 </span></span><span style="display:flex;"><span>		<span style="color:#f92672">...</span>
@@ -347,7 +331,7 @@ pre code {
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
       &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>

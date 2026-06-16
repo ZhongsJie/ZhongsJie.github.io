@@ -1,22 +1,22 @@
 <!DOCTYPE html>
-<html lang="zh-cn">
-  <head>
+<html lang="zh-cn"ZgotmplZ>
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
     <title>Atomage&#39;s Blog</title>
     <meta name="viewport" content="width=device-width,minimum-scale=1">
     <meta name="description" content="分界">
-    <meta name="generator" content="Hugo 0.154.5">
+    <meta name="generator" content="Hugo 0.163.0">
     
     
     
     
-      <meta name="robots" content="index, follow">
+      <meta name="robots" content="noindex, nofollow">
     
 
     
-<link rel="stylesheet" href="../../ananke/css/main.min.65a4ba9d742b05c115846d8e06cf4714294b7ebf3dd26b492a84a9e3cc66923d.css" >
+<link rel="stylesheet" href="../../ananke/css/main.min.css" >
 
 
 
@@ -37,37 +37,21 @@
       
     
     
-    <meta property="og:url" content="https://blogs.atomage.cn/tags/inference/">
-  <meta property="og:site_name" content="Atomage&#39;s Blog">
-  <meta property="og:title" content="Inference">
-  <meta property="og:description" content="分界">
-  <meta property="og:locale" content="zh_cn">
-  <meta property="og:type" content="website">
+    <meta property="og:url" content="http://localhost:1313/tags/inference/">
+	<meta property="og:site_name" content="Atomage&#39;s Blog">
+	<meta property="og:title" content="Inference">
+	<meta property="og:description" content="分界">
+	<meta property="og:locale" content="zh_cn">
+	<meta property="og:type" content="website">
 
-  <meta itemprop="name" content="Inference">
-  <meta itemprop="description" content="分界">
-  <meta itemprop="datePublished" content="2026-06-08T23:39:17+08:00">
-  <meta itemprop="dateModified" content="2026-06-08T23:39:17+08:00">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Inference">
-  <meta name="twitter:description" content="分界">
+	<meta itemprop="name" content="Inference">
+	<meta itemprop="description" content="分界">
+	<meta itemprop="datePublished" content="2026-06-16T10:10:40+08:00">
+	<meta itemprop="dateModified" content="2026-06-16T10:10:40+08:00">
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content="Inference">
+	<meta name="twitter:description" content="分界">
 
-      
-      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
-      <script>
-        var doNotTrack = false;
-        if ( true ) {
-          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
-          var doNotTrack = (dnt == "1" || dnt == "yes");
-        }
-        if (!doNotTrack) {
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-HVT9CMYGB1');
-        }
-      </script>
-    
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <style>
 .toc-sidebar {
@@ -112,7 +96,7 @@ pre code {
 
   </head>
 
-  <body class="ma0 avenir bg-near-white production">
+  <body class="ma0 avenir bg-near-white">
 
     
 
@@ -198,6 +182,39 @@ pre code {
   <div class="bg-white mb3 pa4 gray overflow-hidden">
     <span class="f6 db">📎Posts</span>
     <h1 class="f3 near-black">
+      <a href="../../posts/2026-06-16-dsa-deepseek-sparse-attention/" class="link black dim">
+        DSA(Deepseek Sparse Attention)
+      </a>
+    </h1>
+    <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
+      <h2 id="稀疏注意力">
+    稀疏注意力<a class="hash-link" href="#%e7%a8%80%e7%96%8f%e6%b3%a8%e6%84%8f%e5%8a%9b" title="Direct link to heading">#</a>
+</h2><h3 id="复杂度瓶颈">
+    复杂度瓶颈<a class="hash-link" href="#%e5%a4%8d%e6%9d%82%e5%ba%a6%e7%93%b6%e9%a2%88" title="Direct link to heading">#</a>
+</h3><p>Transformer 架构的核心是缩放点积注意力 (Scaled Dot-Product Attention)：</p>
+$$o_i = \sum_{j=1}^{n} \alpha_{ij} \cdot v_j, \quad \alpha_{ij} = \operatorname{softmax}\left(\frac{q_i^T k_j}{\sqrt{d_k}}\right)_j$$<p>其中 $Q, K, V \in \mathbb{R}^{n \times d}$ 分别是查询、键、值矩阵。</p>
+<p>$QK^T$ 矩阵的形状为 $n \times n$，计算复杂度 $O(n^2 d)$，空间复杂度 $O(n^2)$。对于长序列（$n=128\text{K}$，$d=4096$，FP16），仅注意力矩阵就需要 $128\text{K} \times 128\text{K} \times 2\text{B} \approx 32\text{ GB}$ 显存——单张 GPU 无法承受。</p>
+<blockquote>
+<p>注意力矩阵的稀疏性来源于一个直觉观察：<strong>并非所有 token 对都同等重要</strong>。大多数 token 对之间的注意力权重接近零，仅有少数 token 对承载了主要的信息交互。</p>
+</blockquote>
+<p>这种稀疏性有两层含义：</p>
+<ul>
+<li><strong>自然的局部性</strong>：相邻 token 之间的依赖远强于远距离 token</li>
+<li><strong>内容相关性</strong>：语义相关的 token 即使距离远也需要交互</li>
+</ul>
+<p>稀疏注意力方法试图在信息完整性和计算效率之间寻找最优平衡。
+<img src="../../images/2026-06/Pasted%20image%2020260615100100.png" alt=""></p>
+    </div>
+  </div>
+</div>
+
+        </div>
+      
+        <div class="relative w-100  mb4 bg-white">
+          <div class="relative w-100 mb4 bg-white nested-copy-line-height">
+  <div class="bg-white mb3 pa4 gray overflow-hidden">
+    <span class="f6 db">📎Posts</span>
+    <h1 class="f3 near-black">
       <a href="../../posts/2026-06-08-mla-attention/" class="link black dim">
         MLA(Multi-Head Latent Attention)
       </a>
@@ -219,10 +236,15 @@ $$v_t = W^V h_t$$<ul>
 <li>$h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入；</li>
 <li>$W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ；</li>
 <li>$q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ；
+
 $$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$
+
 $$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$
+
 $$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$
+
 $$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$
+
 $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$</li>
 <li>$q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头；</li>
 <li>$W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵；</li>
@@ -279,7 +301,7 @@ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$</li>
       </a>
     </h1>
     <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
-      <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">WorkerProc</span>:
+      <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">WorkerProc</span>:
 </span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;&#34;&#34;Wrapper that runs one Worker in a separate process.&#34;&#34;&#34;</span>
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>    READY_STR <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;READY&#34;</span>
@@ -309,7 +331,7 @@ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$</li>
 <li>对当前的worker做分布式环境初始化，也就是初始化当前worker的各种<strong>进程组</strong>（如模型并行、流水线并行、数据并行等）</li>
 <li>构造当前worker的GPUModelRunner对象。维护着模型权重分片，还维护模型运行过程中所需要的一些数据结构，比如<strong>kv cache</strong>等，<strong>负责模型权重的加载(load_model)，以及实际的推理执行过程等逻辑。</strong></li>
 </ol>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#a6e22e">@instrument</span>(span_name<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;Init device&#34;</span>)
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#a6e22e">@instrument</span>(span_name<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;Init device&#34;</span>)
 </span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">init_device</span>(self):
 </span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>device_config<span style="color:#f92672">.</span>device_type <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;cuda&#34;</span>:
 </span></span><span style="display:flex;"><span>		<span style="color:#f92672">...</span>
@@ -432,7 +454,7 @@ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$</li>
 <li><strong>转换</strong>：对捕获的图进行分析和转换</li>
 <li><strong>执行</strong>：将转换后的图包装为 <code>GraphModule</code>，可像普通 PyTorch 模块一样执行</li>
 </ol>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">import</span> torch
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">import</span> torch
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#75715e"># Simple module for demonstration</span>
@@ -526,7 +548,7 @@ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$</li>
     <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
       <p>在vllm初始版本中只有一个同步调度策略，在该策略下GPU资源会在调度过程中形成空泡，造成GPU资源的浪费。vllm在v0.10.0版本后提供异步调度策略，并且在后续的迭代中不断加入对于其他特性（例如异步场景下的投机解码）的支持。原始PR内容可查看<a href="https://github.com/vllm-project/vllm/pull/19970">#19970 Implement Async Scheduling </a>，当前代码分析基于<code>main branch(735284ed)</code>。</p>
 <p>EngineCore处理处理Step逻辑：</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_process_engine_step</span>(self) <span style="color:#f92672">-&gt;</span> bool:
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_process_engine_step</span>(self) <span style="color:#f92672">-&gt;</span> bool:
 </span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;&#34;&#34;Called only when there are unfinished local requests.&#34;&#34;&#34;</span>
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Step the engine core.</span>
@@ -540,7 +562,7 @@ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$</li>
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> model_executed
 </span></span></code></pre></div><h3 id="同步调度策略">
     同步调度策略<a class="hash-link" href="#%e5%90%8c%e6%ad%a5%e8%b0%83%e5%ba%a6%e7%ad%96%e7%95%a5" title="Direct link to heading">#</a>
-</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">step</span>(self) <span style="color:#f92672">-&gt;</span> tuple[dict[int, EngineCoreOutputs], bool]:
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">step</span>(self) <span style="color:#f92672">-&gt;</span> tuple[dict[int, EngineCoreOutputs], bool]:
 </span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> <span style="color:#f92672">not</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>has_requests():
 </span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">return</span> {}, <span style="color:#66d9ef">False</span>
 </span></span><span style="display:flex;"><span>  
@@ -576,7 +598,7 @@ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$</li>
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
       &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>

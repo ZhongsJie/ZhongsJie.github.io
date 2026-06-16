@@ -1,22 +1,22 @@
 <!DOCTYPE html>
-<html lang="zh-cn">
-  <head>
+<html lang="zh-cn"ZgotmplZ>
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
     <title>Atomage&#39;s Blog</title>
     <meta name="viewport" content="width=device-width,minimum-scale=1">
     <meta name="description" content="分界">
-    <meta name="generator" content="Hugo 0.154.5">
+    <meta name="generator" content="Hugo 0.163.0">
     
     
     
     
-      <meta name="robots" content="index, follow">
+      <meta name="robots" content="noindex, nofollow">
     
 
     
-<link rel="stylesheet" href="../../ananke/css/main.min.65a4ba9d742b05c115846d8e06cf4714294b7ebf3dd26b492a84a9e3cc66923d.css" >
+<link rel="stylesheet" href="../../ananke/css/main.min.css" >
 
 
 
@@ -37,37 +37,21 @@
       
     
     
-    <meta property="og:url" content="https://blogs.atomage.cn/categories/vllm/">
-  <meta property="og:site_name" content="Atomage&#39;s Blog">
-  <meta property="og:title" content="Vllm">
-  <meta property="og:description" content="分界">
-  <meta property="og:locale" content="zh_cn">
-  <meta property="og:type" content="website">
+    <meta property="og:url" content="http://localhost:1313/categories/vllm/">
+	<meta property="og:site_name" content="Atomage&#39;s Blog">
+	<meta property="og:title" content="Vllm">
+	<meta property="og:description" content="分界">
+	<meta property="og:locale" content="zh_cn">
+	<meta property="og:type" content="website">
 
-  <meta itemprop="name" content="Vllm">
-  <meta itemprop="description" content="分界">
-  <meta itemprop="datePublished" content="2025-12-09T11:51:25+08:00">
-  <meta itemprop="dateModified" content="2025-12-09T11:51:25+08:00">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Vllm">
-  <meta name="twitter:description" content="分界">
+	<meta itemprop="name" content="Vllm">
+	<meta itemprop="description" content="分界">
+	<meta itemprop="datePublished" content="2025-12-09T11:51:25+08:00">
+	<meta itemprop="dateModified" content="2025-12-09T11:51:25+08:00">
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content="Vllm">
+	<meta name="twitter:description" content="分界">
 
-      
-      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
-      <script>
-        var doNotTrack = false;
-        if ( true ) {
-          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
-          var doNotTrack = (dnt == "1" || dnt == "yes");
-        }
-        if (!doNotTrack) {
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-HVT9CMYGB1');
-        }
-      </script>
-    
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <style>
 .toc-sidebar {
@@ -112,7 +96,7 @@ pre code {
 
   </head>
 
-  <body class="ma0 avenir bg-near-white production">
+  <body class="ma0 avenir bg-near-white">
 
     
 
@@ -205,7 +189,7 @@ pre code {
     <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
       <p>在vllm初始版本中只有一个同步调度策略，在该策略下GPU资源会在调度过程中形成空泡，造成GPU资源的浪费。vllm在v0.10.0版本后提供异步调度策略，并且在后续的迭代中不断加入对于其他特性（例如异步场景下的投机解码）的支持。原始PR内容可查看<a href="https://github.com/vllm-project/vllm/pull/19970">#19970 Implement Async Scheduling </a>，当前代码分析基于<code>main branch(735284ed)</code>。</p>
 <p>EngineCore处理处理Step逻辑：</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_process_engine_step</span>(self) <span style="color:#f92672">-&gt;</span> bool:
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_process_engine_step</span>(self) <span style="color:#f92672">-&gt;</span> bool:
 </span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;&#34;&#34;Called only when there are unfinished local requests.&#34;&#34;&#34;</span>
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Step the engine core.</span>
@@ -219,7 +203,7 @@ pre code {
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> model_executed
 </span></span></code></pre></div><h3 id="同步调度策略">
     同步调度策略<a class="hash-link" href="#%e5%90%8c%e6%ad%a5%e8%b0%83%e5%ba%a6%e7%ad%96%e7%95%a5" title="Direct link to heading">#</a>
-</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">step</span>(self) <span style="color:#f92672">-&gt;</span> tuple[dict[int, EngineCoreOutputs], bool]:
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">step</span>(self) <span style="color:#f92672">-&gt;</span> tuple[dict[int, EngineCoreOutputs], bool]:
 </span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> <span style="color:#f92672">not</span> self<span style="color:#f92672">.</span>scheduler<span style="color:#f92672">.</span>has_requests():
 </span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">return</span> {}, <span style="color:#66d9ef">False</span>
 </span></span><span style="display:flex;"><span>  
@@ -255,7 +239,7 @@ pre code {
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
       &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>

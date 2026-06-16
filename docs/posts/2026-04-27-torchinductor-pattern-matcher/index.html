@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-cn">
-  <head>
+<html lang="zh-cn"ZgotmplZ>
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
@@ -90,16 +90,16 @@ def forward(self, x):
     return clamp
 &#34;&#34;&#34;
 FX 图的特点">
-    <meta name="generator" content="Hugo 0.154.5">
+    <meta name="generator" content="Hugo 0.163.0">
     
     
     
     
-      <meta name="robots" content="index, follow">
+      <meta name="robots" content="noindex, nofollow">
     
 
     
-<link rel="stylesheet" href="../../ananke/css/main.min.65a4ba9d742b05c115846d8e06cf4714294b7ebf3dd26b492a84a9e3cc66923d.css" >
+<link rel="stylesheet" href="../../ananke/css/main.min.css" >
 
 
 
@@ -115,54 +115,38 @@ FX 图的特点">
 
     
     
-    <meta property="og:url" content="https://blogs.atomage.cn/posts/2026-04-27-torchinductor-pattern-matcher/">
-  <meta property="og:site_name" content="Atomage&#39;s Blog">
-  <meta property="og:title" content="TorchInductor Pattern Matcher">
-  <meta property="og:description" content="PyTorch FX 图# PyTorch FX 是用于捕获、分析和转换 PyTorch 计算图。FX 图是一种静态表示，它记录了 PyTorch 代码的执行流程。用户通过将模型表示为FX图，可以更轻松地进行各种转换，例如图优化，量化，算子融合等。
+    <meta property="og:url" content="http://localhost:1313/posts/2026-04-27-torchinductor-pattern-matcher/">
+	<meta property="og:site_name" content="Atomage&#39;s Blog">
+	<meta property="og:title" content="TorchInductor Pattern Matcher">
+	<meta property="og:description" content="PyTorch FX 图# PyTorch FX 是用于捕获、分析和转换 PyTorch 计算图。FX 图是一种静态表示，它记录了 PyTorch 代码的执行流程。用户通过将模型表示为FX图，可以更轻松地进行各种转换，例如图优化，量化，算子融合等。
 FX 图的核心组件包括：
 torch.fx.Graph：计算图的容器 torch.fx.Node：图中的节点，表示计算操作，如函数调用、方法调用等 torch.fx.GraphModule：由图构建的可执行模块 graph TD subgraph FX_Graph A[&#34;Placeholder Node&#34;] --&gt; B[&#34;CallFunction Node&#34;] B --&gt; C[&#34;CallMethod Node&#34;] C --&gt; D[&#34;Output Node&#34;] E[&#34;Module Node&#34;] --&gt; B end subgraph Components F[&#34;torch.fx.Graph&#34;] --&gt; FX_Graph G[&#34;torch.fx.Node&#34;] --&gt; A G --&gt; B G --&gt; C G --&gt; D H[&#34;torch.fx.GraphModule&#34;] --&gt; F end style FX_Graph stroke:#333,stroke-width:2px style Components stroke:#333,stroke-width:2px FX Symbolic Tracing# FX 图的生成过程称为&#34;符号追踪&#34;（Symbolic Tracing），主要步骤包括：
 追踪：使用 torch.fx.symbolic_trace() 对 PyTorch 函数或模块进行追踪 捕获：捕获函数执行过程中的所有操作，构建计算图 表示：将计算图表示为 Graph 对象，其中包含一系列 Node 对象 转换：对捕获的图进行分析和转换 执行：将转换后的图包装为 GraphModule，可像普通 PyTorch 模块一样执行 import torch # Simple module for demonstration class MyModule(torch.nn.Module): def __init__(self) -&gt; None: super().__init__() self.param = torch.nn.Parameter(torch.rand(3, 4)) self.linear = torch.nn.Linear(4, 5) def forward(self, x): return self.linear(x &#43; self.param).clamp(min=0.0, max=1.0) module = MyModule() from torch.fx import symbolic_trace # Symbolic tracing frontend - captures the semantics of the module symbolic_traced: torch.fx.GraphModule = symbolic_trace(module) # High-level intermediate representation (IR) - Graph representation # 由一个列表组成 代表函数输入、调用点（函数、方法、 或 torch.nn.Module 实例），以及返回值。 print(symbolic_traced.graph) &#34;&#34;&#34; graph(): %x : [num_users=1] = placeholder[target=x] %param : [num_users=1] = get_attr[target=param] %add : [num_users=1] = call_function[target=operator.add](args = (%x, %param), kwargs = {}) %linear : [num_users=1] = call_module[target=linear](args = (%add,), kwargs = {}) %clamp : [num_users=1] = call_method[target=clamp](args = (%linear,), kwargs = {min: 0.0, max: 1.0}) return clamp &#34;&#34;&#34; # Code generation - valid Python code # 使 FX 成为 Python 到 Python（或 模块到模块）转换工具包。对于每个 Graph IR，我们可以 创建与图语义匹配的有效 Python 代码。 print(symbolic_traced.code) &#34;&#34;&#34; def forward(self, x): param = self.param add = x &#43; param; x = param = None linear = self.linear(add); add = None clamp = linear.clamp(min = 0.0, max = 1.0); linear = None return clamp &#34;&#34;&#34; FX 图的特点">
-  <meta property="og:locale" content="zh_cn">
-  <meta property="og:type" content="article">
-    <meta property="article:section" content="posts">
-    <meta property="article:published_time" content="2026-04-27T21:37:50+08:00">
-    <meta property="article:modified_time" content="2026-04-27T21:37:50+08:00">
-    <meta property="article:tag" content="Vllm">
-    <meta property="article:tag" content="Pytorch">
-    <meta property="article:tag" content="Inference">
+	<meta property="og:locale" content="zh_cn">
+	<meta property="og:type" content="article">
+		<meta property="article:section" content="posts">
+		<meta property="article:published_time" content="2026-04-27T21:37:50+08:00">
+		<meta property="article:modified_time" content="2026-04-27T21:37:50+08:00">
+		<meta property="article:tag" content="Vllm">
+		<meta property="article:tag" content="Pytorch">
+		<meta property="article:tag" content="Inference">
 
-  <meta itemprop="name" content="TorchInductor Pattern Matcher">
-  <meta itemprop="description" content="PyTorch FX 图# PyTorch FX 是用于捕获、分析和转换 PyTorch 计算图。FX 图是一种静态表示，它记录了 PyTorch 代码的执行流程。用户通过将模型表示为FX图，可以更轻松地进行各种转换，例如图优化，量化，算子融合等。
+	<meta itemprop="name" content="TorchInductor Pattern Matcher">
+	<meta itemprop="description" content="PyTorch FX 图# PyTorch FX 是用于捕获、分析和转换 PyTorch 计算图。FX 图是一种静态表示，它记录了 PyTorch 代码的执行流程。用户通过将模型表示为FX图，可以更轻松地进行各种转换，例如图优化，量化，算子融合等。
 FX 图的核心组件包括：
 torch.fx.Graph：计算图的容器 torch.fx.Node：图中的节点，表示计算操作，如函数调用、方法调用等 torch.fx.GraphModule：由图构建的可执行模块 graph TD subgraph FX_Graph A[&#34;Placeholder Node&#34;] --&gt; B[&#34;CallFunction Node&#34;] B --&gt; C[&#34;CallMethod Node&#34;] C --&gt; D[&#34;Output Node&#34;] E[&#34;Module Node&#34;] --&gt; B end subgraph Components F[&#34;torch.fx.Graph&#34;] --&gt; FX_Graph G[&#34;torch.fx.Node&#34;] --&gt; A G --&gt; B G --&gt; C G --&gt; D H[&#34;torch.fx.GraphModule&#34;] --&gt; F end style FX_Graph stroke:#333,stroke-width:2px style Components stroke:#333,stroke-width:2px FX Symbolic Tracing# FX 图的生成过程称为&#34;符号追踪&#34;（Symbolic Tracing），主要步骤包括：
 追踪：使用 torch.fx.symbolic_trace() 对 PyTorch 函数或模块进行追踪 捕获：捕获函数执行过程中的所有操作，构建计算图 表示：将计算图表示为 Graph 对象，其中包含一系列 Node 对象 转换：对捕获的图进行分析和转换 执行：将转换后的图包装为 GraphModule，可像普通 PyTorch 模块一样执行 import torch # Simple module for demonstration class MyModule(torch.nn.Module): def __init__(self) -&gt; None: super().__init__() self.param = torch.nn.Parameter(torch.rand(3, 4)) self.linear = torch.nn.Linear(4, 5) def forward(self, x): return self.linear(x &#43; self.param).clamp(min=0.0, max=1.0) module = MyModule() from torch.fx import symbolic_trace # Symbolic tracing frontend - captures the semantics of the module symbolic_traced: torch.fx.GraphModule = symbolic_trace(module) # High-level intermediate representation (IR) - Graph representation # 由一个列表组成 代表函数输入、调用点（函数、方法、 或 torch.nn.Module 实例），以及返回值。 print(symbolic_traced.graph) &#34;&#34;&#34; graph(): %x : [num_users=1] = placeholder[target=x] %param : [num_users=1] = get_attr[target=param] %add : [num_users=1] = call_function[target=operator.add](args = (%x, %param), kwargs = {}) %linear : [num_users=1] = call_module[target=linear](args = (%add,), kwargs = {}) %clamp : [num_users=1] = call_method[target=clamp](args = (%linear,), kwargs = {min: 0.0, max: 1.0}) return clamp &#34;&#34;&#34; # Code generation - valid Python code # 使 FX 成为 Python 到 Python（或 模块到模块）转换工具包。对于每个 Graph IR，我们可以 创建与图语义匹配的有效 Python 代码。 print(symbolic_traced.code) &#34;&#34;&#34; def forward(self, x): param = self.param add = x &#43; param; x = param = None linear = self.linear(add); add = None clamp = linear.clamp(min = 0.0, max = 1.0); linear = None return clamp &#34;&#34;&#34; FX 图的特点">
-  <meta itemprop="datePublished" content="2026-04-27T21:37:50+08:00">
-  <meta itemprop="dateModified" content="2026-04-27T21:37:50+08:00">
-  <meta itemprop="wordCount" content="4119">
-  <meta itemprop="keywords" content="Vllm,Pytorch,Inference">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="TorchInductor Pattern Matcher">
-  <meta name="twitter:description" content="PyTorch FX 图# PyTorch FX 是用于捕获、分析和转换 PyTorch 计算图。FX 图是一种静态表示，它记录了 PyTorch 代码的执行流程。用户通过将模型表示为FX图，可以更轻松地进行各种转换，例如图优化，量化，算子融合等。
+	<meta itemprop="datePublished" content="2026-04-27T21:37:50+08:00">
+	<meta itemprop="dateModified" content="2026-04-27T21:37:50+08:00">
+	<meta itemprop="wordCount" content="4119">
+	<meta itemprop="keywords" content="Vllm,Pytorch,Inference">
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content="TorchInductor Pattern Matcher">
+	<meta name="twitter:description" content="PyTorch FX 图# PyTorch FX 是用于捕获、分析和转换 PyTorch 计算图。FX 图是一种静态表示，它记录了 PyTorch 代码的执行流程。用户通过将模型表示为FX图，可以更轻松地进行各种转换，例如图优化，量化，算子融合等。
 FX 图的核心组件包括：
 torch.fx.Graph：计算图的容器 torch.fx.Node：图中的节点，表示计算操作，如函数调用、方法调用等 torch.fx.GraphModule：由图构建的可执行模块 graph TD subgraph FX_Graph A[&#34;Placeholder Node&#34;] --&gt; B[&#34;CallFunction Node&#34;] B --&gt; C[&#34;CallMethod Node&#34;] C --&gt; D[&#34;Output Node&#34;] E[&#34;Module Node&#34;] --&gt; B end subgraph Components F[&#34;torch.fx.Graph&#34;] --&gt; FX_Graph G[&#34;torch.fx.Node&#34;] --&gt; A G --&gt; B G --&gt; C G --&gt; D H[&#34;torch.fx.GraphModule&#34;] --&gt; F end style FX_Graph stroke:#333,stroke-width:2px style Components stroke:#333,stroke-width:2px FX Symbolic Tracing# FX 图的生成过程称为&#34;符号追踪&#34;（Symbolic Tracing），主要步骤包括：
 追踪：使用 torch.fx.symbolic_trace() 对 PyTorch 函数或模块进行追踪 捕获：捕获函数执行过程中的所有操作，构建计算图 表示：将计算图表示为 Graph 对象，其中包含一系列 Node 对象 转换：对捕获的图进行分析和转换 执行：将转换后的图包装为 GraphModule，可像普通 PyTorch 模块一样执行 import torch # Simple module for demonstration class MyModule(torch.nn.Module): def __init__(self) -&gt; None: super().__init__() self.param = torch.nn.Parameter(torch.rand(3, 4)) self.linear = torch.nn.Linear(4, 5) def forward(self, x): return self.linear(x &#43; self.param).clamp(min=0.0, max=1.0) module = MyModule() from torch.fx import symbolic_trace # Symbolic tracing frontend - captures the semantics of the module symbolic_traced: torch.fx.GraphModule = symbolic_trace(module) # High-level intermediate representation (IR) - Graph representation # 由一个列表组成 代表函数输入、调用点（函数、方法、 或 torch.nn.Module 实例），以及返回值。 print(symbolic_traced.graph) &#34;&#34;&#34; graph(): %x : [num_users=1] = placeholder[target=x] %param : [num_users=1] = get_attr[target=param] %add : [num_users=1] = call_function[target=operator.add](args = (%x, %param), kwargs = {}) %linear : [num_users=1] = call_module[target=linear](args = (%add,), kwargs = {}) %clamp : [num_users=1] = call_method[target=clamp](args = (%linear,), kwargs = {min: 0.0, max: 1.0}) return clamp &#34;&#34;&#34; # Code generation - valid Python code # 使 FX 成为 Python 到 Python（或 模块到模块）转换工具包。对于每个 Graph IR，我们可以 创建与图语义匹配的有效 Python 代码。 print(symbolic_traced.code) &#34;&#34;&#34; def forward(self, x): param = self.param add = x &#43; param; x = param = None linear = self.linear(add); add = None clamp = linear.clamp(min = 0.0, max = 1.0); linear = None return clamp &#34;&#34;&#34; FX 图的特点">
 
-      
-      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
-      <script>
-        var doNotTrack = false;
-        if ( true ) {
-          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
-          var doNotTrack = (dnt == "1" || dnt == "yes");
-        }
-        if (!doNotTrack) {
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-HVT9CMYGB1');
-        }
-      </script>
-    
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <style>
 .toc-sidebar {
@@ -207,7 +191,7 @@ pre code {
 
   </head>
 
-  <body class="ma0 avenir bg-near-white production">
+  <body class="ma0 avenir bg-near-white">
 
     
 
@@ -388,7 +372,7 @@ pre code {
 <li><strong>转换</strong>：对捕获的图进行分析和转换</li>
 <li><strong>执行</strong>：将转换后的图包装为 <code>GraphModule</code>，可像普通 PyTorch 模块一样执行</li>
 </ol>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">import</span> torch
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">import</span> torch
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#75715e"># Simple module for demonstration</span>
@@ -472,7 +456,7 @@ pre code {
 <p>以下是一个<code>Rmsnorm + Quant</code>的示例，初步解释如何注册，以及内部执行Replace的逻辑。</p>
 <p><img src="../../images/2026-04/Pasted%20image%2020260420171816.png" alt=""></p>
 <p><code>torch.compile</code>将Python函数捕获到FX图中，并且Inductor在代码生成前会经过一系列图传递（passes），模式匹配发生在多个阶段（pre-grad/joint and post-grad)），但是大部分融合模式发生在Post-grad阶段，可以在<code>torch/_inductor/fx_passes/post_grad.py</code>中查看。</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> post_grad_custom_post_pass <span style="color:#f92672">:=</span> config<span style="color:#f92672">.</span>post_grad_custom_post_pass:
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> post_grad_custom_post_pass <span style="color:#f92672">:=</span> config<span style="color:#f92672">.</span>post_grad_custom_post_pass:
 </span></span><span style="display:flex;"><span>    GraphTransformObserver(gm, <span style="color:#e6db74">&#34;post_grad_custom_post_pass&#34;</span>)<span style="color:#f92672">.</span>apply_graph_pass(
 </span></span><span style="display:flex;"><span>        post_grad_custom_post_pass
 </span></span><span style="display:flex;"><span>    )
@@ -493,7 +477,7 @@ pre code {
 </li>
 </ul>
 <p>vLLM 广泛使用 <code>register_replacement</code>，因为它在保持可读性的前提下与原始代码逻辑接近。</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">register_replacement</span>(
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">register_replacement</span>(
 </span></span><span style="display:flex;"><span>    pattern: Callable,
 </span></span><span style="display:flex;"><span>    replacement: Callable,
 </span></span><span style="display:flex;"><span>    example_inputs: List[Tensor],
@@ -521,7 +505,7 @@ pre code {
 </h4><blockquote>
 <p>PatternMatcherPass会遍历整张图，进行patterns匹配等操作。</p>
 </blockquote>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">PatternMatcherPass</span>:
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">PatternMatcherPass</span>:
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">apply</span>(self, graph: torch<span style="color:#f92672">.</span>fx<span style="color:#f92672">.</span>GraphModule) <span style="color:#f92672">-&gt;</span> int:
 </span></span><span style="display:flex;"><span>        <span style="color:#f92672">...</span>
 </span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">for</span> node <span style="color:#f92672">in</span> reversed(graph<span style="color:#f92672">.</span>nodes):
@@ -560,7 +544,7 @@ pre code {
 <li>更好地做依赖分析和内存规划</li>
 </ul>
 <p>但自定义算子<strong>很多是in‑place</strong>（例如做 KV cache 更新、in‑place 写 view 等）</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># 原始操作</span>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># 原始操作</span>
 </span></span><span style="display:flex;"><span>foo_inplace(x)    <span style="color:#75715e"># 修改张量 x</span>
 </span></span><span style="display:flex;"><span>bar_out(x, out)   <span style="color:#75715e"># 使用修改后的 x，产生 out</span>
 </span></span><span style="display:flex;"><span>
@@ -581,7 +565,7 @@ pre code {
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> at[<span style="color:#ae81ff">1</span>], at[<span style="color:#ae81ff">2</span>]  <span style="color:#75715e"># 返回原始返回值和修改后的参数</span>
 </span></span></code></pre></div><p><img src="../../images/2026-04/Pasted%20image%2020260420192807.png" alt=""></p>
 <p><code>auto_functionalized</code> 会克隆mutated_arg，并通过克隆的参数调用op，最终并返回一个元组：</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>(original_return, mutated_arg1, mutated_arg2, <span style="color:#f92672">...</span>)
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>(original_return, mutated_arg1, mutated_arg2, <span style="color:#f92672">...</span>)
 </span></span></code></pre></div><p>这使得 FX 图中存在显式的数据依赖关系，使模式匹配能够正确工作。</p>
 <ul>
 <li>在图里插入一个高阶算子 <code>auto_functionalized</code>；
@@ -602,7 +586,7 @@ pre code {
 </h3><blockquote>
 <p>继承自 <code>VllmInductorPass</code>，提供了模式注册、匹配计数、调试信息输出等功能</p>
 </blockquote>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">VllmPatternMatcherPass</span>(VllmInductorPass):
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">VllmPatternMatcherPass</span>(VllmInductorPass):
 </span></span><span style="display:flex;"><span>    matched_count: int <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>
 </span></span><span style="display:flex;"><span>    match_table: ClassVar[defaultdict[str, int]] <span style="color:#f92672">=</span> defaultdict(int)
 </span></span><span style="display:flex;"><span>    
@@ -613,7 +597,7 @@ pre code {
 </h3><blockquote>
 <p>继承自 <code>VllmPatternMatcherPass</code>，使用 <code>VllmPatternReplacement</code> 对象进行模式注册。</p>
 </blockquote>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">VllmFusionPatternMatcherPass</span>(VllmPatternMatcherPass):
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">VllmFusionPatternMatcherPass</span>(VllmPatternMatcherPass):
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">__init__</span>(self, config: VllmConfig, pass_name: str) <span style="color:#f92672">-&gt;</span> <span style="color:#66d9ef">None</span>:
 </span></span><span style="display:flex;"><span>        super()<span style="color:#f92672">.</span><span style="color:#a6e22e">__init__</span>(config)
 </span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>pm_pass <span style="color:#f92672">=</span> PatternMatcherPass(pass_name<span style="color:#f92672">=</span>pass_name)
@@ -640,7 +624,7 @@ pre code {
 <p>这些操作在解码阶段会被频繁执行，成为性能瓶颈。vllm 使用 Pattern Matcher 识别上述计算模式，并将其替换为一个融合的内核 <code>minimax_allreduce_rms_qk</code>，从而能够更高效地执行这些操作。vllm-ascend中通过Patch实现<code>MiniMaxM2Attention.forward = _patch_forward</code></p>
 <h4 id="模式定义">
     模式定义<a class="hash-link" href="#%e6%a8%a1%e5%bc%8f%e5%ae%9a%e4%b9%89" title="Direct link to heading">#</a>
-</h4><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">pattern</span>(
+</h4><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">pattern</span>(
 </span></span><span style="display:flex;"><span>    qkv: torch<span style="color:#f92672">.</span>Tensor,
 </span></span><span style="display:flex;"><span>    q_weight: torch<span style="color:#f92672">.</span>Tensor,
 </span></span><span style="display:flex;"><span>    k_weight: torch<span style="color:#f92672">.</span>Tensor,
@@ -681,7 +665,7 @@ pre code {
 </ul>
 <h4 id="替换定义">
     替换定义<a class="hash-link" href="#%e6%9b%bf%e6%8d%a2%e5%ae%9a%e4%b9%89" title="Direct link to heading">#</a>
-</h4><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">replacement</span>(
+</h4><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">replacement</span>(
 </span></span><span style="display:flex;"><span>    qkv: torch<span style="color:#f92672">.</span>Tensor,
 </span></span><span style="display:flex;"><span>    q_weight: torch<span style="color:#f92672">.</span>Tensor,
 </span></span><span style="display:flex;"><span>    k_weight: torch<span style="color:#f92672">.</span>Tensor,
@@ -703,12 +687,12 @@ pre code {
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> q_out, k_out, v
 </span></span></code></pre></div><h4 id="模式注册">
     模式注册<a class="hash-link" href="#%e6%a8%a1%e5%bc%8f%e6%b3%a8%e5%86%8c" title="Direct link to heading">#</a>
-</h4><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>pm<span style="color:#f92672">.</span>register_replacement(
+</h4><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>pm<span style="color:#f92672">.</span>register_replacement(
 </span></span><span style="display:flex;"><span>    pattern, replacement, self<span style="color:#f92672">.</span>get_inputs(), pm<span style="color:#f92672">.</span>fwd_only, pm_pass
 </span></span><span style="display:flex;"><span>)
 </span></span></code></pre></div><h4 id="minimaxqknormpass">
     MiniMaxQKNormPass<a class="hash-link" href="#minimaxqknormpass" title="Direct link to heading">#</a>
-</h4><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MiniMaxQKNormPass</span>(VllmPatternMatcherPass):
+</h4><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MiniMaxQKNormPass</span>(VllmPatternMatcherPass):
 </span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">__init__</span>(self, config: VllmConfig) <span style="color:#f92672">-&gt;</span> <span style="color:#66d9ef">None</span>:
 </span></span><span style="display:flex;"><span>		self<span style="color:#f92672">.</span>patterns: PatternMatcherPass <span style="color:#f92672">=</span> PatternMatcherPass(
 </span></span><span style="display:flex;"><span>            pass_name<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;minimax_qk_norm_pass&#34;</span>
@@ -772,7 +756,7 @@ pre code {
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
       &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>

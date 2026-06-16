@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-cn">
-  <head>
+<html lang="zh-cn"ZgotmplZ>
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
@@ -22,10 +22,15 @@ $n_h$: Attention头数；
 $h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入；
 $W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ；
 $q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ；
+
 $$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$
+
 $$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$
+
 $$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$
+
 $$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$
+
 $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$
 $q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头；
 $W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵；
@@ -35,16 +40,16 @@ $W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵；
     MQA（多查询注意力）#
 
 所有 $n_h$ 个 Q head 共享同一套 K、V，只剩 1 套，更快的推理速度：由于内存和缓存需求大幅下降，内存带宽开销也基本消除。虽然训练效率基本保持不变，但与 MHA 相比，共享 K/V 对可能会导致模型质量和输出精度略有下降">
-    <meta name="generator" content="Hugo 0.154.5">
+    <meta name="generator" content="Hugo 0.163.0">
     
     
     
     
-      <meta name="robots" content="index, follow">
+      <meta name="robots" content="noindex, nofollow">
     
 
     
-<link rel="stylesheet" href="../../ananke/css/main.min.65a4ba9d742b05c115846d8e06cf4714294b7ebf3dd26b492a84a9e3cc66923d.css" >
+<link rel="stylesheet" href="../../ananke/css/main.min.css" >
 
 
 
@@ -60,45 +65,29 @@ $W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵；
 
     
     
-    <meta property="og:url" content="https://blogs.atomage.cn/posts/2026-06-08-mla-attention/">
-  <meta property="og:site_name" content="Atomage&#39;s Blog">
-  <meta property="og:title" content="MLA(Multi-Head Latent Attention)">
-  <meta property="og:description" content="MHA（多头注意力）# $$Attention(Q, K, V) = softmax(Q·K^T / \sqrt{d_h}) · V$$ $$q_t = W^Q h_t$$ $$k_t = W^K h_t$$ $$v_t = W^V h_t$$ $d$: Embedding维度； $d_h$：每一个头的维度； $n_h$: Attention头数； $h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入； $W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ； $q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ； $$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$ $$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$ $$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$ $$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$ $q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头； $W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵； 每个 token 单层需要缓存的 cache 的是 $n_h$ 套 ($k,v$) — 共 $2n_hd_h$ MQA（多查询注意力）# 所有 $n_h$ 个 Q head 共享同一套 K、V，只剩 1 套，更快的推理速度：由于内存和缓存需求大幅下降，内存带宽开销也基本消除。虽然训练效率基本保持不变，但与 MHA 相比，共享 K/V 对可能会导致模型质量和输出精度略有下降">
-  <meta property="og:locale" content="zh_cn">
-  <meta property="og:type" content="article">
-    <meta property="article:section" content="posts">
-    <meta property="article:published_time" content="2026-06-08T23:39:17+08:00">
-    <meta property="article:modified_time" content="2026-06-08T23:39:17+08:00">
-    <meta property="article:tag" content="Deepseek">
-    <meta property="article:tag" content="Inference">
-    <meta property="article:tag" content="Attention">
+    <meta property="og:url" content="http://localhost:1313/posts/2026-06-08-mla-attention/">
+	<meta property="og:site_name" content="Atomage&#39;s Blog">
+	<meta property="og:title" content="MLA(Multi-Head Latent Attention)">
+	<meta property="og:description" content="MHA（多头注意力）# $$Attention(Q, K, V) = softmax(Q·K^T / \sqrt{d_h}) · V$$ $$q_t = W^Q h_t$$ $$k_t = W^K h_t$$ $$v_t = W^V h_t$$ $d$: Embedding维度； $d_h$：每一个头的维度； $n_h$: Attention头数； $h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入； $W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ； $q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ； $$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$ $$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$ $$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$ $$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$ $q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头； $W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵； 每个 token 单层需要缓存的 cache 的是 $n_h$ 套 ($k,v$) — 共 $2n_hd_h$ MQA（多查询注意力）# 所有 $n_h$ 个 Q head 共享同一套 K、V，只剩 1 套，更快的推理速度：由于内存和缓存需求大幅下降，内存带宽开销也基本消除。虽然训练效率基本保持不变，但与 MHA 相比，共享 K/V 对可能会导致模型质量和输出精度略有下降">
+	<meta property="og:locale" content="zh_cn">
+	<meta property="og:type" content="article">
+		<meta property="article:section" content="posts">
+		<meta property="article:published_time" content="2026-06-08T23:39:17+08:00">
+		<meta property="article:modified_time" content="2026-06-08T23:39:17+08:00">
+		<meta property="article:tag" content="Deepseek">
+		<meta property="article:tag" content="Inference">
+		<meta property="article:tag" content="Attention">
 
-  <meta itemprop="name" content="MLA(Multi-Head Latent Attention)">
-  <meta itemprop="description" content="MHA（多头注意力）# $$Attention(Q, K, V) = softmax(Q·K^T / \sqrt{d_h}) · V$$ $$q_t = W^Q h_t$$ $$k_t = W^K h_t$$ $$v_t = W^V h_t$$ $d$: Embedding维度； $d_h$：每一个头的维度； $n_h$: Attention头数； $h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入； $W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ； $q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ； $$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$ $$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$ $$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$ $$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$ $q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头； $W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵； 每个 token 单层需要缓存的 cache 的是 $n_h$ 套 ($k,v$) — 共 $2n_hd_h$ MQA（多查询注意力）# 所有 $n_h$ 个 Q head 共享同一套 K、V，只剩 1 套，更快的推理速度：由于内存和缓存需求大幅下降，内存带宽开销也基本消除。虽然训练效率基本保持不变，但与 MHA 相比，共享 K/V 对可能会导致模型质量和输出精度略有下降">
-  <meta itemprop="datePublished" content="2026-06-08T23:39:17+08:00">
-  <meta itemprop="dateModified" content="2026-06-08T23:39:17+08:00">
-  <meta itemprop="wordCount" content="7277">
-  <meta itemprop="keywords" content="Deepseek,Inference,Attention">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="MLA(Multi-Head Latent Attention)">
-  <meta name="twitter:description" content="MHA（多头注意力）# $$Attention(Q, K, V) = softmax(Q·K^T / \sqrt{d_h}) · V$$ $$q_t = W^Q h_t$$ $$k_t = W^K h_t$$ $$v_t = W^V h_t$$ $d$: Embedding维度； $d_h$：每一个头的维度； $n_h$: Attention头数； $h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入； $W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ； $q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ； $$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$ $$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$ $$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$ $$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$ $q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头； $W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵； 每个 token 单层需要缓存的 cache 的是 $n_h$ 套 ($k,v$) — 共 $2n_hd_h$ MQA（多查询注意力）# 所有 $n_h$ 个 Q head 共享同一套 K、V，只剩 1 套，更快的推理速度：由于内存和缓存需求大幅下降，内存带宽开销也基本消除。虽然训练效率基本保持不变，但与 MHA 相比，共享 K/V 对可能会导致模型质量和输出精度略有下降">
+	<meta itemprop="name" content="MLA(Multi-Head Latent Attention)">
+	<meta itemprop="description" content="MHA（多头注意力）# $$Attention(Q, K, V) = softmax(Q·K^T / \sqrt{d_h}) · V$$ $$q_t = W^Q h_t$$ $$k_t = W^K h_t$$ $$v_t = W^V h_t$$ $d$: Embedding维度； $d_h$：每一个头的维度； $n_h$: Attention头数； $h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入； $W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ； $q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ； $$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$ $$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$ $$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$ $$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$ $q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头； $W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵； 每个 token 单层需要缓存的 cache 的是 $n_h$ 套 ($k,v$) — 共 $2n_hd_h$ MQA（多查询注意力）# 所有 $n_h$ 个 Q head 共享同一套 K、V，只剩 1 套，更快的推理速度：由于内存和缓存需求大幅下降，内存带宽开销也基本消除。虽然训练效率基本保持不变，但与 MHA 相比，共享 K/V 对可能会导致模型质量和输出精度略有下降">
+	<meta itemprop="datePublished" content="2026-06-08T23:39:17+08:00">
+	<meta itemprop="dateModified" content="2026-06-08T23:39:17+08:00">
+	<meta itemprop="wordCount" content="7277">
+	<meta itemprop="keywords" content="Deepseek,Inference,Attention">
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content="MLA(Multi-Head Latent Attention)">
+	<meta name="twitter:description" content="MHA（多头注意力）# $$Attention(Q, K, V) = softmax(Q·K^T / \sqrt{d_h}) · V$$ $$q_t = W^Q h_t$$ $$k_t = W^K h_t$$ $$v_t = W^V h_t$$ $d$: Embedding维度； $d_h$：每一个头的维度； $n_h$: Attention头数； $h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入； $W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ； $q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ； $$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$ $$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$ $$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$ $$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$ $q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头； $W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵； 每个 token 单层需要缓存的 cache 的是 $n_h$ 套 ($k,v$) — 共 $2n_hd_h$ MQA（多查询注意力）# 所有 $n_h$ 个 Q head 共享同一套 K、V，只剩 1 套，更快的推理速度：由于内存和缓存需求大幅下降，内存带宽开销也基本消除。虽然训练效率基本保持不变，但与 MHA 相比，共享 K/V 对可能会导致模型质量和输出精度略有下降">
 
-      
-      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
-      <script>
-        var doNotTrack = false;
-        if ( true ) {
-          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
-          var doNotTrack = (dnt == "1" || dnt == "yes");
-        }
-        if (!doNotTrack) {
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-HVT9CMYGB1');
-        }
-      </script>
-    
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <style>
 .toc-sidebar {
@@ -143,7 +132,7 @@ pre code {
 
   </head>
 
-  <body class="ma0 avenir bg-near-white production">
+  <body class="ma0 avenir bg-near-white">
 
     
 
@@ -313,10 +302,15 @@ $$v_t = W^V h_t$$<ul>
 <li>$h_t ∈ ℝ^{d}$： Attention单层中第$t$ 个token的输入；</li>
 <li>$W^Q, W^K, W^V ∈ ℝ^{d_hn_h × d}$ ；</li>
 <li>$q_t,k_t,v_t ∈ ℝ^{d_hn_h}$ ；
+
 $$[q_{𝑡,1};q_{𝑡,2}; ...; q_{𝑡,𝑛_ℎ} ] = q_t$$
+
 $$[k_{𝑡,1};k_{𝑡,2}; ...; k_{𝑡,𝑛_ℎ} ] = k_t$$
+
 $$[v_{𝑡,1};v_{𝑡,2}; ...; v_{𝑡,𝑛_ℎ} ] = v_t$$
+
 $$o_{t,j} = \sum_{j=1}^t{softmax_j(q_{t,i}^T·k_{j,i} / \sqrt{d_h})} · v_{j,i}$$
+
 $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$</li>
 <li>$q_{t,i},k_{t,i},v_{t,i} ∈ ℝ^{d_h}$ : 第$i$个Attention头；</li>
 <li>$W^O ∈ ℝ^{d × d_hn_h}$ ：输出投影矩阵；</li>
@@ -398,7 +392,9 @@ $$c_t^{KV} = W^{DKV} · h_t$$<ul>
 <li>$c_t^{KV} ∈ ℝ^{d_c}$  ：压缩后的 KV 联合隐向量, $d_c \ll d_hd_n$</li>
 <li>$W^{DKV} ∈ ℝ^{d_c \times  d}$： 下投影矩阵 ，低秩变化矩阵</li>
 <li>$d_c = 512$ ：论文中取$4\times d_h$，远小于 $d_h·n_h$ = 16384 (压缩比 32:1)
+
 $$k_t^{C}=W^{UK} · c_t^{KV}$$
+
 $$v_t^{C}=W^{UV} · c_t^{KV}$$</li>
 <li>$W^{UK}, W^{UV} ∈ ℝ^{d_hn_h \times  d_c}$： 上投影矩阵</li>
 </ul>
@@ -755,7 +751,7 @@ $$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d
 </ol>
 <h3 id="配置读取">
     配置读取<a class="hash-link" href="#%e9%85%8d%e7%bd%ae%e8%af%bb%e5%8f%96" title="Direct link to heading">#</a>
-</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># 从 HuggingFace config 读取 MLA 维度。</span>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># 从 HuggingFace config 读取 MLA 维度。</span>
 </span></span><span style="display:flex;"><span><span style="color:#75715e"># qk_nope_head_dim: 不参与 RoPE 的 Q/K 维度。</span>
 </span></span><span style="display:flex;"><span><span style="color:#75715e"># qk_rope_head_dim: 参与 RoPE 的 Q/K 维度。</span>
 </span></span><span style="display:flex;"><span><span style="color:#75715e"># v_head_dim: value head dim。</span>
@@ -782,7 +778,7 @@ $$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d
 </span></span><span style="display:flex;"><span>    attn_cls <span style="color:#f92672">=</span> DeepseekV2Attention
 </span></span></code></pre></div><h3 id="deepseekv2mlaattention初始化">
     DeepseekV2MLAAttention初始化<a class="hash-link" href="#deepseekv2mlaattention%e5%88%9d%e5%a7%8b%e5%8c%96" title="Direct link to heading">#</a>
-</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DeepseekV2MLAAttention</span>(nn<span style="color:#f92672">.</span>Module):
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DeepseekV2MLAAttention</span>(nn<span style="color:#f92672">.</span>Module):
 </span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;&#34;&#34;
 </span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    核心组件:
 </span></span></span><span style="display:flex;"><span><span style="color:#e6db74">    - q_lora_rank: Q 的低秩维度
@@ -834,16 +830,16 @@ $$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d
 </span></span><span style="display:flex;"><span>            prefix<span style="color:#f92672">=</span><span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{</span>prefix<span style="color:#e6db74">}</span><span style="color:#e6db74">.o_proj&#34;</span>,
 </span></span><span style="display:flex;"><span>        )
 </span></span></code></pre></div><p>MLA 的核心参数关系：</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-text" data-lang="text"><span style="display:flex;"><span>cache entry dim = kv_lora_rank + qk_rope_head_dim
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-text" data-lang="text"><span style="display:flex;"><span>cache entry dim = kv_lora_rank + qk_rope_head_dim
 </span></span><span style="display:flex;"><span>q head dim      = qk_nope_head_dim + qk_rope_head_dim
 </span></span><span style="display:flex;"><span>value head dim  = v_head_dim
 </span></span></code></pre></div><p>DeepSeek R1/V3 常见值：</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-text" data-lang="text"><span style="display:flex;"><span>kv_lora_rank = 512
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-text" data-lang="text"><span style="display:flex;"><span>kv_lora_rank = 512
 </span></span><span style="display:flex;"><span>qk_rope_head_dim = 64
 </span></span><span style="display:flex;"><span>cache entry dim = 576
 </span></span></code></pre></div><h3 id="mla-wrapper前处理">
     MLA Wrapper前处理<a class="hash-link" href="#mla-wrapper%e5%89%8d%e5%a4%84%e7%90%86" title="Direct link to heading">#</a>
-</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#a6e22e">@PluggableLayer.register</span>(<span style="color:#e6db74">&#34;multi_head_latent_attention&#34;</span>)
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#a6e22e">@PluggableLayer.register</span>(<span style="color:#e6db74">&#34;multi_head_latent_attention&#34;</span>)
 </span></span><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MultiHeadLatentAttentionWrapper</span>(PluggableLayer):
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward</span>(self, positions, hidden_states, llama_4_scaling<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>):
 </span></span><span style="display:flex;"><span>        q_c <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
@@ -913,7 +909,7 @@ $$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d
 </ul>
 <h3 id="mlaattention-初始化确定-cache-entry-形态和-backend">
     MLAAttention 初始化：确定 cache entry 形态和 backend<a class="hash-link" href="#mlaattention-%e5%88%9d%e5%a7%8b%e5%8c%96%e7%a1%ae%e5%ae%9a-cache-entry-%e5%bd%a2%e6%80%81%e5%92%8c-backend" title="Direct link to heading">#</a>
-</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MLAAttention</span>(nn<span style="color:#f92672">.</span>Module, AttentionLayerBase):
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MLAAttention</span>(nn<span style="color:#f92672">.</span>Module, AttentionLayerBase):
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">__init__</span>(<span style="color:#f92672">...</span>):
 </span></span><span style="display:flex;"><span>        <span style="color:#f92672">...</span>
 </span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>num_heads <span style="color:#f92672">=</span> num_heads
@@ -969,7 +965,7 @@ $$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d
 </ul>
 <h3 id="forward过程先更新kv-cache再计算attention">
     Forward过程：先更新KV cache，再计算attention<a class="hash-link" href="#forward%e8%bf%87%e7%a8%8b%e5%85%88%e6%9b%b4%e6%96%b0kv-cache%e5%86%8d%e8%ae%a1%e7%ae%97attention" title="Direct link to heading">#</a>
-</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MLAAttention</span>(nn<span style="color:#f92672">.</span>Module, AttentionLayerBase):
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MLAAttention</span>(nn<span style="color:#f92672">.</span>Module, AttentionLayerBase):
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward</span>(self, q, kv_c_normed, k_pe, output_shape<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>):
 </span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>calculate_kv_scales:
 </span></span><span style="display:flex;"><span>            <span style="color:#75715e"># FP8 / quantized KV cache 场景可动态计算 q/k/v scale。</span>
@@ -1013,7 +1009,7 @@ $$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d
 </span></span><span style="display:flex;"><span>                output<span style="color:#f92672">=</span>output,
 </span></span><span style="display:flex;"><span>            )
 </span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">return</span> output
-</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">do_kv_cache_update</span>(
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">do_kv_cache_update</span>(
 </span></span><span style="display:flex;"><span>    self,
 </span></span><span style="display:flex;"><span>    kv_c_normed,
 </span></span><span style="display:flex;"><span>    k_pe,
@@ -1040,7 +1036,7 @@ $$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d
 </span></span><span style="display:flex;"><span>    )
 </span></span></code></pre></div><h3 id="forward_impl把-batch-拆成-prefill-和-decode">
     forward_impl：把 batch 拆成 prefill 和 decode<a class="hash-link" href="#forward_impl%e6%8a%8a-batch-%e6%8b%86%e6%88%90-prefill-%e5%92%8c-decode" title="Direct link to heading">#</a>
-</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>fp8_attention <span style="color:#f92672">=</span> is_quantized_kv_cache(self<span style="color:#f92672">.</span>kv_cache_dtype)
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>fp8_attention <span style="color:#f92672">=</span> is_quantized_kv_cache(self<span style="color:#f92672">.</span>kv_cache_dtype)
 </span></span><span style="display:flex;"><span>num_actual_toks <span style="color:#f92672">=</span> attn_metadata<span style="color:#f92672">.</span>num_actual_tokens
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#75715e"># CUDA graph 会 padding 输入输出，这里只截取真实 token。</span>
@@ -1104,7 +1100,7 @@ $$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d
 </ul>
 <h3 id="prefill-mha当前-token-与历史-context-分开算">
     Prefill MHA：当前 token 与历史 context 分开算<a class="hash-link" href="#prefill-mha%e5%bd%93%e5%89%8d-token-%e4%b8%8e%e5%8e%86%e5%8f%b2-context-%e5%88%86%e5%bc%80%e7%ae%97" title="Direct link to heading">#</a>
-</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward_mha</span>(self, q, kv_c_normed, k_pe, kv_cache, attn_metadata, k_scale, output):
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward_mha</span>(self, q, kv_c_normed, k_pe, kv_cache, attn_metadata, k_scale, output):
 </span></span><span style="display:flex;"><span>    prefill_metadata <span style="color:#f92672">=</span> attn_metadata<span style="color:#f92672">.</span>prefill
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 当前 prefill chunk 的新 token，需要从 latent KV 展开出 k_nope 和 v。</span>
@@ -1160,7 +1156,7 @@ $$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d
 </h3><blockquote>
 <p>这里以Triton实现为例，vllm/v1/attention/backends/mla/triton_mla.py</p>
 </blockquote>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward_mqa</span>(self, q, kv_c_and_k_pe_cache, attn_metadata, layer):
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward_mqa</span>(self, q, kv_c_and_k_pe_cache, attn_metadata, layer):
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">assert</span> kv_c_and_k_pe_cache<span style="color:#f92672">.</span>numel() <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">assert</span> attn_metadata<span style="color:#f92672">.</span>decode <span style="color:#f92672">is</span> <span style="color:#f92672">not</span> <span style="color:#66d9ef">None</span>
 </span></span><span style="display:flex;"><span>
@@ -1220,7 +1216,7 @@ $$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d
 </ul>
 <h3 id="kv-cache">
     KV cache<a class="hash-link" href="#kv-cache" title="Direct link to heading">#</a>
-</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_kv_cache_spec</span>(self, vllm_config):
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_kv_cache_spec</span>(self, vllm_config):
 </span></span><span style="display:flex;"><span>    kv_cache_dtype <span style="color:#f92672">=</span> kv_cache_dtype_str_to_dtype(
 </span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>kv_cache_dtype,
 </span></span><span style="display:flex;"><span>        vllm_config<span style="color:#f92672">.</span>model_config,
@@ -1238,7 +1234,7 @@ $$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d
 </span></span><span style="display:flex;"><span>        dtype<span style="color:#f92672">=</span>kv_cache_dtype,
 </span></span><span style="display:flex;"><span>        cache_dtype_str<span style="color:#f92672">=</span>vllm_config<span style="color:#f92672">.</span>cache_config<span style="color:#f92672">.</span>cache_dtype,
 </span></span><span style="display:flex;"><span>    )
-</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#a6e22e">@dataclass</span>(frozen<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>, kw_only<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>)
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#a6e22e">@dataclass</span>(frozen<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>, kw_only<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>)
 </span></span><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MLAAttentionSpec</span>(FullAttentionSpec):
 </span></span><span style="display:flex;"><span>    cache_dtype_str: str <span style="color:#f92672">|</span> <span style="color:#66d9ef">None</span> <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
 </span></span><span style="display:flex;"><span>
@@ -1259,7 +1255,7 @@ $$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d
 </span></span><span style="display:flex;"><span>            <span style="color:#f92672">*</span> get_dtype_size(self<span style="color:#f92672">.</span>dtype)
 </span></span><span style="display:flex;"><span>        )
 </span></span></code></pre></div><p>对比普通 full attention：</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># FullAttentionSpec.real_page_size_bytes</span>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># FullAttentionSpec.real_page_size_bytes</span>
 </span></span><span style="display:flex;"><span><span style="color:#66d9ef">return</span> (
 </span></span><span style="display:flex;"><span>    <span style="color:#ae81ff">2</span>
 </span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>block_size
@@ -1268,7 +1264,7 @@ $$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d
 </span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span> get_dtype_size(self<span style="color:#f92672">.</span>dtype)
 </span></span><span style="display:flex;"><span>)
 </span></span></code></pre></div><p>MLA cache 省内存的直接原因就是少了传统 K/V 双缓存，并且没有按所有 attention heads 展开。</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_kv_cache_shape</span>(
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_kv_cache_shape</span>(
 </span></span><span style="display:flex;"><span>    num_blocks,
 </span></span><span style="display:flex;"><span>    block_size,
 </span></span><span style="display:flex;"><span>    num_kv_heads,  <span style="color:#75715e"># MLA 假设为 1。</span>
@@ -1279,10 +1275,10 @@ $$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d
 </span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 不是 [2, num_blocks, block_size, heads, head_dim]。</span>
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> (num_blocks, block_size, head_size)
 </span></span></code></pre></div><p>典型 DeepSeek R1/V3：</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-text" data-lang="text"><span style="display:flex;"><span>kv_cache.shape = [num_blocks, block_size, 576]
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-text" data-lang="text"><span style="display:flex;"><span>kv_cache.shape = [num_blocks, block_size, 576]
 </span></span><span style="display:flex;"><span>576 = 512 kv_lora_rank + 64 qk_rope_head_dim
 </span></span></code></pre></div><p>Sparse FlashMLA 的 <code>fp8_ds_mla</code> 特例：</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> cache_dtype_str <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;fp8_ds_mla&#34;</span>:
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> cache_dtype_str <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;fp8_ds_mla&#34;</span>:
 </span></span><span style="display:flex;"><span>    <span style="color:#75715e"># DeepSeek 特化 packed cache 格式。</span>
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> (num_blocks, block_size, <span style="color:#ae81ff">656</span>)
 </span></span><span style="display:flex;"><span><span style="color:#66d9ef">else</span>:
@@ -1306,7 +1302,7 @@ $$<p>所以 MLA 的 KV Cache 大小从 MHA 的：$2 n_h d_h$压缩为：$d_c + d
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
       &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>

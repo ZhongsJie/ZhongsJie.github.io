@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-cn">
-  <head>
+<html lang="zh-cn"ZgotmplZ>
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
@@ -105,16 +105,16 @@ def init_device(self):
     init_worker_distributed_environment#
 
 负责初始化分布式推理所需的所有环境组件">
-    <meta name="generator" content="Hugo 0.154.5">
+    <meta name="generator" content="Hugo 0.163.0">
     
     
     
     
-      <meta name="robots" content="index, follow">
+      <meta name="robots" content="noindex, nofollow">
     
 
     
-<link rel="stylesheet" href="../../ananke/css/main.min.65a4ba9d742b05c115846d8e06cf4714294b7ebf3dd26b492a84a9e3cc66923d.css" >
+<link rel="stylesheet" href="../../ananke/css/main.min.css" >
 
 
 
@@ -130,48 +130,32 @@ def init_device(self):
 
     
     
-    <meta property="og:url" content="https://blogs.atomage.cn/posts/2026-04-28-vllm-distributed-communication/">
-  <meta property="og:site_name" content="Atomage&#39;s Blog">
-  <meta property="og:title" content="vLLM 分布式通信">
-  <meta property="og:description" content="class WorkerProc: &#34;&#34;&#34;Wrapper that runs one Worker in a separate process.&#34;&#34;&#34; READY_STR = &#34;READY&#34; rpc_broadcast_mq: MessageQueue | None worker_response_mq: MessageQueue | None @instrument(span_name=&#34;Worker init&#34;) def __init__(...): self.rank = rank wrapper = WorkerWrapperBase(rpc_rank=local_rank, global_rank=rank) ... wrapper.init_worker(all_kwargs) self.worker = wrapper ... self.worker.init_device() if envs.VLLM_ELASTIC_EP_SCALE_UP_LAUNCH: self.worker.elastic_ep_execute(&#34;load_model&#34;) else: self.worker.load_model() 。。 Worker init_device# worker的init_device函数负责初始化设备的相关信息
+    <meta property="og:url" content="http://localhost:1313/posts/2026-04-28-vllm-distributed-communication/">
+	<meta property="og:site_name" content="Atomage&#39;s Blog">
+	<meta property="og:title" content="vLLM 分布式通信">
+	<meta property="og:description" content="class WorkerProc: &#34;&#34;&#34;Wrapper that runs one Worker in a separate process.&#34;&#34;&#34; READY_STR = &#34;READY&#34; rpc_broadcast_mq: MessageQueue | None worker_response_mq: MessageQueue | None @instrument(span_name=&#34;Worker init&#34;) def __init__(...): self.rank = rank wrapper = WorkerWrapperBase(rpc_rank=local_rank, global_rank=rank) ... wrapper.init_worker(all_kwargs) self.worker = wrapper ... self.worker.init_device() if envs.VLLM_ELASTIC_EP_SCALE_UP_LAUNCH: self.worker.elastic_ep_execute(&#34;load_model&#34;) else: self.worker.load_model() 。。 Worker init_device# worker的init_device函数负责初始化设备的相关信息
 根据当前worker的rank找到它所属的device，将它绑到指定的卡上，以及清空该device的显存，获取该device的显存大小等 对当前的worker做分布式环境初始化，也就是初始化当前worker的各种进程组（如模型并行、流水线并行、数据并行等） 构造当前worker的GPUModelRunner对象。维护着模型权重分片，还维护模型运行过程中所需要的一些数据结构，比如kv cache等，负责模型权重的加载(load_model)，以及实际的推理执行过程等逻辑。 @instrument(span_name=&#34;Init device&#34;) def init_device(self): if self.device_config.device_type == &#34;cuda&#34;: ... # Ray 会设置 NCCL_ASYNC_ERROR_HANDLING，但这个环境变量会导致 CUDA graph # 构建时出现异常。CUDA graph 需要同步执行，而该变量会引入异步错误处理， # 两者可能引起冲突。 os.environ.pop(&#34;NCCL_ASYNC_ERROR_HANDLING&#34;, None) ... # - Ray/external_launcher 场景：这些分布式执行器自己管理GPU映射 # - 多节点场景(nnodes_within_dp &gt; 1)：每个节点有独立的GPU集合，映射逻辑不同 # - Ray作为DP后端：Ray的resource pool处理GPU分配 if ( parallel_config.distributed_executor_backend not in (&#34;ray&#34;, &#34;external_launcher&#34;) and parallel_config.data_parallel_backend != &#34;ray&#34; and parallel_config.nnodes_within_dp == 1 # 单节点场景 ): # local DP rank 表示在当前节点内的数据并行编号，而 global rank 可能 # 跨节点。在单节点场景下，GPU映射只看节点内的local rank。 dp_local_rank = self.parallel_config.data_parallel_rank_local if dp_local_rank is None: dp_local_rank = self.parallel_config.data_parallel_index # DP副本 0 (dp_local_rank=0) # original_local_rank=0 → GPU 0 &#43; 0×2 = GPU 0 # original_local_rank=0 → GPU 0 &#43; 1×2 = GPU 2 ← 偏移 # 偏移是为了计算出实际的rank信息，后续用来初始化device self.local_rank &#43;= dp_local_rank * tp_pp_world_size 。。 self.device = torch.device(f&#34;cuda:{self.local_rank}&#34;) # PyTorch的设备API演进：从 torch.cuda.set_device() 到 # torch.accelerator.set_device_index()。 后续可以不用再手动指定， torch.accelerator.set_device_index(self.device) ... # 初始化分布式推理所需的所有环境，包括通信组信息 # 优先于内存快照处理逻辑，NCCL在初始化会分配内部缓存区，提前初始化用于保证显存计算的准确性 init_worker_distributed_environment( self.vllm_config, self.rank, self.distributed_init_method, self.local_rank, current_platform.dist_backend, ) # 1. gc.collect() 回收Python层的垃圾对象，释放可能的GPU引用 # 2. empty_cache() 释放PyTorch缓存的显存（包括NCCL缓冲区） # 得到一个&#34;干净&#34;的显存状态，作为基准线 gc.collect() torch.accelerator.empty_cache() # 用于后续计算 KV cache 可用显存。 # init_snapshot 记录当前可用显存，request_memory 根据模型配置 # 计算需要预留的 KV cache 大小。 self.init_snapshot = init_snapshot = MemorySnapshot(device=self.device) self.requested_memory = request_memory(init_snapshot, self.cache_config) # 最后初始化modelrunner，需要依赖设备、分布式通信环境，同时通过快照可以计算出可以分配的kv cache显存大小 if self.use_v2_model_runner: ... self.model_runner: GPUModelRunner = GPUModelRunnerV2( # type: ignore self.vllm_config, self.device ) else: ... self.model_runner = GPUModelRunnerV1(self.vllm_config, self.device) ... init_worker_distributed_environment# 负责初始化分布式推理所需的所有环境组件">
-  <meta property="og:locale" content="zh_cn">
-  <meta property="og:type" content="article">
-    <meta property="article:section" content="posts">
-    <meta property="article:published_time" content="2026-04-28T11:03:49+08:00">
-    <meta property="article:modified_time" content="2026-04-28T11:03:49+08:00">
-    <meta property="article:tag" content="Vllm">
-    <meta property="article:tag" content="Ai">
-    <meta property="article:tag" content="Inference">
+	<meta property="og:locale" content="zh_cn">
+	<meta property="og:type" content="article">
+		<meta property="article:section" content="posts">
+		<meta property="article:published_time" content="2026-04-28T11:03:49+08:00">
+		<meta property="article:modified_time" content="2026-04-28T11:03:49+08:00">
+		<meta property="article:tag" content="Vllm">
+		<meta property="article:tag" content="Ai">
+		<meta property="article:tag" content="Inference">
 
-  <meta itemprop="name" content="vLLM 分布式通信">
-  <meta itemprop="description" content="class WorkerProc: &#34;&#34;&#34;Wrapper that runs one Worker in a separate process.&#34;&#34;&#34; READY_STR = &#34;READY&#34; rpc_broadcast_mq: MessageQueue | None worker_response_mq: MessageQueue | None @instrument(span_name=&#34;Worker init&#34;) def __init__(...): self.rank = rank wrapper = WorkerWrapperBase(rpc_rank=local_rank, global_rank=rank) ... wrapper.init_worker(all_kwargs) self.worker = wrapper ... self.worker.init_device() if envs.VLLM_ELASTIC_EP_SCALE_UP_LAUNCH: self.worker.elastic_ep_execute(&#34;load_model&#34;) else: self.worker.load_model() 。。 Worker init_device# worker的init_device函数负责初始化设备的相关信息
+	<meta itemprop="name" content="vLLM 分布式通信">
+	<meta itemprop="description" content="class WorkerProc: &#34;&#34;&#34;Wrapper that runs one Worker in a separate process.&#34;&#34;&#34; READY_STR = &#34;READY&#34; rpc_broadcast_mq: MessageQueue | None worker_response_mq: MessageQueue | None @instrument(span_name=&#34;Worker init&#34;) def __init__(...): self.rank = rank wrapper = WorkerWrapperBase(rpc_rank=local_rank, global_rank=rank) ... wrapper.init_worker(all_kwargs) self.worker = wrapper ... self.worker.init_device() if envs.VLLM_ELASTIC_EP_SCALE_UP_LAUNCH: self.worker.elastic_ep_execute(&#34;load_model&#34;) else: self.worker.load_model() 。。 Worker init_device# worker的init_device函数负责初始化设备的相关信息
 根据当前worker的rank找到它所属的device，将它绑到指定的卡上，以及清空该device的显存，获取该device的显存大小等 对当前的worker做分布式环境初始化，也就是初始化当前worker的各种进程组（如模型并行、流水线并行、数据并行等） 构造当前worker的GPUModelRunner对象。维护着模型权重分片，还维护模型运行过程中所需要的一些数据结构，比如kv cache等，负责模型权重的加载(load_model)，以及实际的推理执行过程等逻辑。 @instrument(span_name=&#34;Init device&#34;) def init_device(self): if self.device_config.device_type == &#34;cuda&#34;: ... # Ray 会设置 NCCL_ASYNC_ERROR_HANDLING，但这个环境变量会导致 CUDA graph # 构建时出现异常。CUDA graph 需要同步执行，而该变量会引入异步错误处理， # 两者可能引起冲突。 os.environ.pop(&#34;NCCL_ASYNC_ERROR_HANDLING&#34;, None) ... # - Ray/external_launcher 场景：这些分布式执行器自己管理GPU映射 # - 多节点场景(nnodes_within_dp &gt; 1)：每个节点有独立的GPU集合，映射逻辑不同 # - Ray作为DP后端：Ray的resource pool处理GPU分配 if ( parallel_config.distributed_executor_backend not in (&#34;ray&#34;, &#34;external_launcher&#34;) and parallel_config.data_parallel_backend != &#34;ray&#34; and parallel_config.nnodes_within_dp == 1 # 单节点场景 ): # local DP rank 表示在当前节点内的数据并行编号，而 global rank 可能 # 跨节点。在单节点场景下，GPU映射只看节点内的local rank。 dp_local_rank = self.parallel_config.data_parallel_rank_local if dp_local_rank is None: dp_local_rank = self.parallel_config.data_parallel_index # DP副本 0 (dp_local_rank=0) # original_local_rank=0 → GPU 0 &#43; 0×2 = GPU 0 # original_local_rank=0 → GPU 0 &#43; 1×2 = GPU 2 ← 偏移 # 偏移是为了计算出实际的rank信息，后续用来初始化device self.local_rank &#43;= dp_local_rank * tp_pp_world_size 。。 self.device = torch.device(f&#34;cuda:{self.local_rank}&#34;) # PyTorch的设备API演进：从 torch.cuda.set_device() 到 # torch.accelerator.set_device_index()。 后续可以不用再手动指定， torch.accelerator.set_device_index(self.device) ... # 初始化分布式推理所需的所有环境，包括通信组信息 # 优先于内存快照处理逻辑，NCCL在初始化会分配内部缓存区，提前初始化用于保证显存计算的准确性 init_worker_distributed_environment( self.vllm_config, self.rank, self.distributed_init_method, self.local_rank, current_platform.dist_backend, ) # 1. gc.collect() 回收Python层的垃圾对象，释放可能的GPU引用 # 2. empty_cache() 释放PyTorch缓存的显存（包括NCCL缓冲区） # 得到一个&#34;干净&#34;的显存状态，作为基准线 gc.collect() torch.accelerator.empty_cache() # 用于后续计算 KV cache 可用显存。 # init_snapshot 记录当前可用显存，request_memory 根据模型配置 # 计算需要预留的 KV cache 大小。 self.init_snapshot = init_snapshot = MemorySnapshot(device=self.device) self.requested_memory = request_memory(init_snapshot, self.cache_config) # 最后初始化modelrunner，需要依赖设备、分布式通信环境，同时通过快照可以计算出可以分配的kv cache显存大小 if self.use_v2_model_runner: ... self.model_runner: GPUModelRunner = GPUModelRunnerV2( # type: ignore self.vllm_config, self.device ) else: ... self.model_runner = GPUModelRunnerV1(self.vllm_config, self.device) ... init_worker_distributed_environment# 负责初始化分布式推理所需的所有环境组件">
-  <meta itemprop="datePublished" content="2026-04-28T11:03:49+08:00">
-  <meta itemprop="dateModified" content="2026-04-28T11:03:49+08:00">
-  <meta itemprop="wordCount" content="5846">
-  <meta itemprop="keywords" content="Vllm,Ai,Inference">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="vLLM 分布式通信">
-  <meta name="twitter:description" content="class WorkerProc: &#34;&#34;&#34;Wrapper that runs one Worker in a separate process.&#34;&#34;&#34; READY_STR = &#34;READY&#34; rpc_broadcast_mq: MessageQueue | None worker_response_mq: MessageQueue | None @instrument(span_name=&#34;Worker init&#34;) def __init__(...): self.rank = rank wrapper = WorkerWrapperBase(rpc_rank=local_rank, global_rank=rank) ... wrapper.init_worker(all_kwargs) self.worker = wrapper ... self.worker.init_device() if envs.VLLM_ELASTIC_EP_SCALE_UP_LAUNCH: self.worker.elastic_ep_execute(&#34;load_model&#34;) else: self.worker.load_model() 。。 Worker init_device# worker的init_device函数负责初始化设备的相关信息
+	<meta itemprop="datePublished" content="2026-04-28T11:03:49+08:00">
+	<meta itemprop="dateModified" content="2026-04-28T11:03:49+08:00">
+	<meta itemprop="wordCount" content="5846">
+	<meta itemprop="keywords" content="Vllm,Ai,Inference">
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content="vLLM 分布式通信">
+	<meta name="twitter:description" content="class WorkerProc: &#34;&#34;&#34;Wrapper that runs one Worker in a separate process.&#34;&#34;&#34; READY_STR = &#34;READY&#34; rpc_broadcast_mq: MessageQueue | None worker_response_mq: MessageQueue | None @instrument(span_name=&#34;Worker init&#34;) def __init__(...): self.rank = rank wrapper = WorkerWrapperBase(rpc_rank=local_rank, global_rank=rank) ... wrapper.init_worker(all_kwargs) self.worker = wrapper ... self.worker.init_device() if envs.VLLM_ELASTIC_EP_SCALE_UP_LAUNCH: self.worker.elastic_ep_execute(&#34;load_model&#34;) else: self.worker.load_model() 。。 Worker init_device# worker的init_device函数负责初始化设备的相关信息
 根据当前worker的rank找到它所属的device，将它绑到指定的卡上，以及清空该device的显存，获取该device的显存大小等 对当前的worker做分布式环境初始化，也就是初始化当前worker的各种进程组（如模型并行、流水线并行、数据并行等） 构造当前worker的GPUModelRunner对象。维护着模型权重分片，还维护模型运行过程中所需要的一些数据结构，比如kv cache等，负责模型权重的加载(load_model)，以及实际的推理执行过程等逻辑。 @instrument(span_name=&#34;Init device&#34;) def init_device(self): if self.device_config.device_type == &#34;cuda&#34;: ... # Ray 会设置 NCCL_ASYNC_ERROR_HANDLING，但这个环境变量会导致 CUDA graph # 构建时出现异常。CUDA graph 需要同步执行，而该变量会引入异步错误处理， # 两者可能引起冲突。 os.environ.pop(&#34;NCCL_ASYNC_ERROR_HANDLING&#34;, None) ... # - Ray/external_launcher 场景：这些分布式执行器自己管理GPU映射 # - 多节点场景(nnodes_within_dp &gt; 1)：每个节点有独立的GPU集合，映射逻辑不同 # - Ray作为DP后端：Ray的resource pool处理GPU分配 if ( parallel_config.distributed_executor_backend not in (&#34;ray&#34;, &#34;external_launcher&#34;) and parallel_config.data_parallel_backend != &#34;ray&#34; and parallel_config.nnodes_within_dp == 1 # 单节点场景 ): # local DP rank 表示在当前节点内的数据并行编号，而 global rank 可能 # 跨节点。在单节点场景下，GPU映射只看节点内的local rank。 dp_local_rank = self.parallel_config.data_parallel_rank_local if dp_local_rank is None: dp_local_rank = self.parallel_config.data_parallel_index # DP副本 0 (dp_local_rank=0) # original_local_rank=0 → GPU 0 &#43; 0×2 = GPU 0 # original_local_rank=0 → GPU 0 &#43; 1×2 = GPU 2 ← 偏移 # 偏移是为了计算出实际的rank信息，后续用来初始化device self.local_rank &#43;= dp_local_rank * tp_pp_world_size 。。 self.device = torch.device(f&#34;cuda:{self.local_rank}&#34;) # PyTorch的设备API演进：从 torch.cuda.set_device() 到 # torch.accelerator.set_device_index()。 后续可以不用再手动指定， torch.accelerator.set_device_index(self.device) ... # 初始化分布式推理所需的所有环境，包括通信组信息 # 优先于内存快照处理逻辑，NCCL在初始化会分配内部缓存区，提前初始化用于保证显存计算的准确性 init_worker_distributed_environment( self.vllm_config, self.rank, self.distributed_init_method, self.local_rank, current_platform.dist_backend, ) # 1. gc.collect() 回收Python层的垃圾对象，释放可能的GPU引用 # 2. empty_cache() 释放PyTorch缓存的显存（包括NCCL缓冲区） # 得到一个&#34;干净&#34;的显存状态，作为基准线 gc.collect() torch.accelerator.empty_cache() # 用于后续计算 KV cache 可用显存。 # init_snapshot 记录当前可用显存，request_memory 根据模型配置 # 计算需要预留的 KV cache 大小。 self.init_snapshot = init_snapshot = MemorySnapshot(device=self.device) self.requested_memory = request_memory(init_snapshot, self.cache_config) # 最后初始化modelrunner，需要依赖设备、分布式通信环境，同时通过快照可以计算出可以分配的kv cache显存大小 if self.use_v2_model_runner: ... self.model_runner: GPUModelRunner = GPUModelRunnerV2( # type: ignore self.vllm_config, self.device ) else: ... self.model_runner = GPUModelRunnerV1(self.vllm_config, self.device) ... init_worker_distributed_environment# 负责初始化分布式推理所需的所有环境组件">
 
-      
-      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
-      <script>
-        var doNotTrack = false;
-        if ( true ) {
-          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
-          var doNotTrack = (dnt == "1" || dnt == "yes");
-        }
-        if (!doNotTrack) {
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-HVT9CMYGB1');
-        }
-      </script>
-    
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <style>
 .toc-sidebar {
@@ -216,7 +200,7 @@ pre code {
 
   </head>
 
-  <body class="ma0 avenir bg-near-white production">
+  <body class="ma0 avenir bg-near-white">
 
     
 
@@ -360,7 +344,7 @@ pre code {
       </header>
 
       <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray">
-        <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">WorkerProc</span>:
+        <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">WorkerProc</span>:
 </span></span><span style="display:flex;"><span>    <span style="color:#e6db74">&#34;&#34;&#34;Wrapper that runs one Worker in a separate process.&#34;&#34;&#34;</span>
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>    READY_STR <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;READY&#34;</span>
@@ -390,7 +374,7 @@ pre code {
 <li>对当前的worker做分布式环境初始化，也就是初始化当前worker的各种<strong>进程组</strong>（如模型并行、流水线并行、数据并行等）</li>
 <li>构造当前worker的GPUModelRunner对象。维护着模型权重分片，还维护模型运行过程中所需要的一些数据结构，比如<strong>kv cache</strong>等，<strong>负责模型权重的加载(load_model)，以及实际的推理执行过程等逻辑。</strong></li>
 </ol>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#a6e22e">@instrument</span>(span_name<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;Init device&#34;</span>)
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#a6e22e">@instrument</span>(span_name<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;Init device&#34;</span>)
 </span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">init_device</span>(self):
 </span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>device_config<span style="color:#f92672">.</span>device_type <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;cuda&#34;</span>:
 </span></span><span style="display:flex;"><span>		<span style="color:#f92672">...</span>
@@ -460,7 +444,7 @@ pre code {
 </h2><blockquote>
 <p>负责初始化分布式推理所需的所有环境组件</p>
 </blockquote>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">init_worker_distributed_environment</span>(
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">init_worker_distributed_environment</span>(
 </span></span><span style="display:flex;"><span>    vllm_config: VllmConfig,
 </span></span><span style="display:flex;"><span>    rank: int,
 </span></span><span style="display:flex;"><span>    distributed_init_method: str <span style="color:#f92672">|</span> <span style="color:#66d9ef">None</span> <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>,
@@ -564,7 +548,7 @@ pre code {
 </h2><blockquote>
 <p>vLLM中的分布式主要在 vllm/distributed/parallel_state.py 文件中实现，它抽象了 PyTorch 原生的分布式操作，并提供了针对不同并行策略（张量并行、流水线并行、数据并行）的特定通信组和接口。</p>
 </blockquote>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">init_distributed_environment</span>(
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">init_distributed_environment</span>(
 </span></span><span style="display:flex;"><span>    world_size: int <span style="color:#f92672">=</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>, <span style="color:#75715e"># TP*PP，用于创建 worker 进程数（影响进程数量）</span>
 </span></span><span style="display:flex;"><span>    rank: int <span style="color:#f92672">=</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>,
 </span></span><span style="display:flex;"><span>    distributed_init_method: str <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;env://&#34;</span>,
@@ -641,7 +625,7 @@ pre code {
 <li>统一 CPU 和 GPU 通信 - 同时管理 cpu_group （用于元数据传输）和 device_group （用于张量通信）</li>
 <li>平台无关性 - 隐藏了 NCCL/Gloo 等后端的差异</li>
 </ul>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>rank: int              <span style="color:#75715e"># 全局 rank</span>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>rank: int              <span style="color:#75715e"># 全局 rank</span>
 </span></span><span style="display:flex;"><span>ranks: list[int]       <span style="color:#75715e"># 组内所有进程的全局 rank</span>
 </span></span><span style="display:flex;"><span>world_size: int        <span style="color:#75715e"># 组内进程数</span>
 </span></span><span style="display:flex;"><span>local_rank: int        <span style="color:#75715e"># 本地设备编号（用于绑定 GPU）</span>
@@ -650,7 +634,7 @@ pre code {
 </span></span><span style="display:flex;"><span>device_group: ProcessGroup  <span style="color:#75715e"># GPU 通信组（nccl 后端）</span>
 </span></span><span style="display:flex;"><span>device_communicator: DeviceCommunicatorBase  <span style="color:#75715e"># 设备通信器封装</span>
 </span></span><span style="display:flex;"><span>mq_broadcaster: Any <span style="color:#f92672">|</span> <span style="color:#66d9ef">None</span> <span style="color:#75715e"># 一个可选的基于共享内存的消息队列广播器，用于高效广播对象（特别是当源 rank 固定时）。</span>
-</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">__init__</span>(<span style="color:#f92672">...</span>):
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">__init__</span>(<span style="color:#f92672">...</span>):
 </span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">for</span> ranks <span style="color:#f92672">in</span> group_ranks:
 </span></span><span style="display:flex;"><span>		device_group <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>distributed<span style="color:#f92672">.</span>new_group(
 </span></span><span style="display:flex;"><span>			ranks, backend<span style="color:#f92672">=</span>torch_distributed_backend
@@ -668,72 +652,72 @@ pre code {
 <h3 id="集合通信操作">
     集合通信操作<a class="hash-link" href="#%e9%9b%86%e5%90%88%e9%80%9a%e4%bf%a1%e6%93%8d%e4%bd%9c" title="Direct link to heading">#</a>
 </h3><table>
-  <thead>
-      <tr>
-          <th>方法</th>
-          <th>作用</th>
-          <th>使用场景</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td><code>all_reduce(input_)</code></td>
-          <td>所有进程同时执行归约操作，结果分发给所有进程</td>
-          <td>TP内同步隐藏状态</td>
-      </tr>
-      <tr>
-          <td><code>all_gather(input_, dim)</code></td>
-          <td>收集所有进程的张量并拼接</td>
-          <td>DP内收集输出</td>
-      </tr>
-      <tr>
-          <td><code>reduce_scatter(input_, dim)</code></td>
-          <td>先归约再分散到各进程</td>
-          <td>负载均衡</td>
-      </tr>
-      <tr>
-          <td><code>gather(input_, dst, dim)</code></td>
-          <td>收集到指定进程</td>
-          <td>PP内收集layers</td>
-      </tr>
-      <tr>
-          <td><code>broadcast(input_, src)</code></td>
-          <td>从 src 广播张量到所有进程</td>
-          <td>PP内广播layers</td>
-      </tr>
-  </tbody>
+	<thead>
+			<tr>
+					<th>方法</th>
+					<th>作用</th>
+					<th>使用场景</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><code>all_reduce(input_)</code></td>
+					<td>所有进程同时执行归约操作，结果分发给所有进程</td>
+					<td>TP内同步隐藏状态</td>
+			</tr>
+			<tr>
+					<td><code>all_gather(input_, dim)</code></td>
+					<td>收集所有进程的张量并拼接</td>
+					<td>DP内收集输出</td>
+			</tr>
+			<tr>
+					<td><code>reduce_scatter(input_, dim)</code></td>
+					<td>先归约再分散到各进程</td>
+					<td>负载均衡</td>
+			</tr>
+			<tr>
+					<td><code>gather(input_, dst, dim)</code></td>
+					<td>收集到指定进程</td>
+					<td>PP内收集layers</td>
+			</tr>
+			<tr>
+					<td><code>broadcast(input_, src)</code></td>
+					<td>从 src 广播张量到所有进程</td>
+					<td>PP内广播layers</td>
+			</tr>
+	</tbody>
 </table>
 <h3 id="对象通信操作">
     对象通信操作<a class="hash-link" href="#%e5%af%b9%e8%b1%a1%e9%80%9a%e4%bf%a1%e6%93%8d%e4%bd%9c" title="Direct link to heading">#</a>
 </h3><table>
-  <thead>
-      <tr>
-          <th>方法</th>
-          <th>作用</th>
-          <th>使用场景</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td><code>broadcast_object(obj, src)</code></td>
-          <td>广播 Python 对象（通过 pickle 序列化）</td>
-          <td>广播配置</td>
-      </tr>
-      <tr>
-          <td><code>send_object(obj, dst)</code></td>
-          <td>发送 Python 对象到指定进程</td>
-          <td>点对点传输元数据</td>
-      </tr>
-      <tr>
-          <td><code>recv_object(src)</code></td>
-          <td>从指定进程接收 Python 对象</td>
-          <td>点对点接收元数据</td>
-      </tr>
-  </tbody>
+	<thead>
+			<tr>
+					<th>方法</th>
+					<th>作用</th>
+					<th>使用场景</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><code>broadcast_object(obj, src)</code></td>
+					<td>广播 Python 对象（通过 pickle 序列化）</td>
+					<td>广播配置</td>
+			</tr>
+			<tr>
+					<td><code>send_object(obj, dst)</code></td>
+					<td>发送 Python 对象到指定进程</td>
+					<td>点对点传输元数据</td>
+			</tr>
+			<tr>
+					<td><code>recv_object(src)</code></td>
+					<td>从指定进程接收 Python 对象</td>
+					<td>点对点接收元数据</td>
+			</tr>
+	</tbody>
 </table>
 <h3 id="张量字典通信">
     张量字典通信<a class="hash-link" href="#%e5%bc%a0%e9%87%8f%e5%ad%97%e5%85%b8%e9%80%9a%e4%bf%a1" title="Direct link to heading">#</a>
-</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>broadcast_tensor_dict(tensor_dict, src)  <span style="color:#75715e"># 广播包含任意类型值的字典</span>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>broadcast_tensor_dict(tensor_dict, src)  <span style="color:#75715e"># 广播包含任意类型值的字典</span>
 </span></span><span style="display:flex;"><span>send_tensor_dict(tensor_dict, dst)         <span style="color:#75715e"># 发送字典</span>
 </span></span></code></pre></div><p>这是 vLLM 中非常常用的功能，因为模型权重、KV cache 等都以字典形式存储。</p>
 <h2 id="ensure_model_parallel_initialized">
@@ -741,7 +725,7 @@ pre code {
 </h2><blockquote>
 <p>通信组的初始化逻辑</p>
 </blockquote>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">ensure_model_parallel_initialized</span>(
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">ensure_model_parallel_initialized</span>(
 </span></span><span style="display:flex;"><span>    tensor_model_parallel_size: int,
 </span></span><span style="display:flex;"><span>    pipeline_model_parallel_size: int,
 </span></span><span style="display:flex;"><span>    prefill_context_model_parallel_size: int <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>,
@@ -762,7 +746,7 @@ pre code {
 </span></span></code></pre></div><p>调用<code>initialize_model_parallel</code>，用于根据用户指定的 tensor_model_parallel_size 和 pipeline_model_parallel_size (以及从配置中获取的 data_parallel_size) 来划分和创建<strong>全局变量</strong>中的 <code>_TP</code>、<code>_PP</code> 和 <code>_DP</code> 组等。</p>
 <h3 id="initialize_model_parallel">
     <code>initialize_model_parallel</code><a class="hash-link" href="#initialize_model_parallel" title="Direct link to heading">#</a>
-</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">initialize_model_parallel</span>(<span style="color:#f92672">...</span>):
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">initialize_model_parallel</span>(<span style="color:#f92672">...</span>):
 </span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Step 1: 构建多维 rank 数组</span>
 </span></span><span style="display:flex;"><span>    <span style="color:#75715e"># shape: (ExternalDP, DP, PP, PCP, TP)</span>
 </span></span><span style="display:flex;"><span>    <span style="color:#75715e"># ExternalDP=1, DP=2, PP=2, PCP=1, TP=2（EP=DP*PCP*TP=4)</span>
@@ -903,7 +887,7 @@ ep_group_ranks = [
 </h2><blockquote>
 <p>Ascend提供一个细粒度的并行策略</p>
 </blockquote>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_create_or_get_group</span>(group_size: int, group_name: str) <span style="color:#f92672">-&gt;</span> GroupCoordinator:
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">_create_or_get_group</span>(group_size: int, group_name: str) <span style="color:#f92672">-&gt;</span> GroupCoordinator:
 </span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> group_size <span style="color:#f92672">is</span> <span style="color:#66d9ef">None</span>:
 </span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">return</span> <span style="color:#66d9ef">None</span>
 </span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> group_size <span style="color:#f92672">not</span> <span style="color:#f92672">in</span> _group_cache:
@@ -943,7 +927,7 @@ ep_group_ranks = [
 </span></span><span style="display:flex;"><span>	_MLP_TP <span style="color:#f92672">=</span> _create_or_get_group(mlp_tp_size, <span style="color:#e6db74">&#34;mlptp&#34;</span>)
 </span></span></code></pre></div><p>num_chunks = DP / group_size = 2 / 2 = 1
 遍历过程:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>PP<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>, chunk<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>, TP<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span> <span style="color:#f92672">-&gt;</span> [<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">2</span>]
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>PP<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>, chunk<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>, TP<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span> <span style="color:#f92672">-&gt;</span> [<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">2</span>]
 </span></span><span style="display:flex;"><span>PP<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>, chunk<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>, TP<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span> <span style="color:#f92672">-&gt;</span> [<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">3</span>]
 </span></span><span style="display:flex;"><span>PP<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>, chunk<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>, TP<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span> <span style="color:#f92672">-&gt;</span> [<span style="color:#ae81ff">4</span>, <span style="color:#ae81ff">6</span>]
 </span></span><span style="display:flex;"><span>PP<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>, chunk<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>, TP<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span> <span style="color:#f92672">-&gt;</span> [<span style="color:#ae81ff">5</span>, <span style="color:#ae81ff">7</span>]
@@ -961,7 +945,7 @@ ep_group_ranks = [
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
       &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>
