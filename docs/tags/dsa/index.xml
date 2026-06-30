@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+	<channel>
+		<title>DSA on Atomage&#39;s Blog</title>
+		<link>https://blogs.atomage.cn/tags/dsa/</link>
+		<description>Recent content in DSA on Atomage&#39;s Blog</description>
+		<generator>Hugo</generator>
+		<language>zh-cn</language>
+		
+		
+		
+		
+			<lastBuildDate>Tue, 23 Jun 2026 09:05:11 +0800</lastBuildDate>
+		
+			<atom:link href="https://blogs.atomage.cn/tags/dsa/index.xml" rel="self" type="application/rss+xml" />
+			<item>
+				<title>IndexCache：DeepSeek 稀疏注意力中的跨层索引复用</title>
+				<link>https://blogs.atomage.cn/posts/2026-06-23-indexcache/</link>
+				<pubDate>Tue, 23 Jun 2026 09:05:11 +0800</pubDate>
+				<guid>https://blogs.atomage.cn/posts/2026-06-23-indexcache/</guid>
+				<description>&lt;p&gt;&lt;img src=&#34;../../images/2026-06/indexcache-layer-similarity.png&#34; alt=&#34;&#34;&gt;&lt;/p&gt;&#xA;&lt;h2 id=&#34;技术背景&#34;&gt;&#xA;    技术背景&lt;a class=&#34;hash-link&#34; href=&#34;#%e6%8a%80%e6%9c%af%e8%83%8c%e6%99%af&#34; title=&#34;Direct link to heading&#34;&gt;#&lt;/a&gt;&#xA;&lt;/h2&gt;&lt;h3 id=&#34;mla-已经解决了-kv-cache-存储问题&#34;&gt;&#xA;    MLA 已经解决了 KV Cache 存储问题&lt;a class=&#34;hash-link&#34; href=&#34;#mla-%e5%b7%b2%e7%bb%8f%e8%a7%a3%e5%86%b3%e4%ba%86-kv-cache-%e5%ad%98%e5%82%a8%e9%97%ae%e9%a2%98&#34; title=&#34;Direct link to heading&#34;&gt;#&lt;/a&gt;&#xA;&lt;/h3&gt;&lt;p&gt;DeepSeek-V2 提出的 &lt;strong&gt;MLA（Multi-head Latent Attention）&lt;/strong&gt; 将 KV Cache 压缩到了极低的水平：&lt;/p&gt;&#xA;&lt;ul&gt;&#xA;&lt;li&gt;每 token 仅缓存 &lt;strong&gt;576 个元素&lt;/strong&gt;（512 维压缩隐向量 + 64 维 RoPE 分量）&lt;/li&gt;&#xA;&lt;li&gt;相当于 MHA 的 &lt;strong&gt;1.76%&lt;/strong&gt;&lt;/li&gt;&#xA;&lt;li&gt;128K 上下文下，FP8 KV Cache 仅需 &lt;strong&gt;8.72 GB&lt;/strong&gt;（对比 Llama-70B 的 343 GB）&lt;/li&gt;&#xA;&lt;/ul&gt;&#xA;&lt;p&gt;MLA 的压缩技巧在于：K 和 V 共享一个低秩隐向量 $c_t^{KV} \in \mathbb{R}^{512}$，推理时通过矩阵吸收技巧避免显式恢复高维 K/V。但是，MLA 仍然是&lt;strong&gt;全注意力&lt;/strong&gt;——每个 query token 仍然要计算与所有历史 token 的注意力分数。当上下文长度增长到 128K 以上时，注意力计算量本身成为新瓶颈。&lt;/p&gt;&#xA;&lt;h3 id=&#34;从全注意力到稀疏注意力&#34;&gt;&#xA;    从全注意力到稀疏注意力&lt;a class=&#34;hash-link&#34; href=&#34;#%e4%bb%8e%e5%85%a8%e6%b3%a8%e6%84%8f%e5%8a%9b%e5%88%b0%e7%a8%80%e7%96%8f%e6%b3%a8%e6%84%8f%e5%8a%9b&#34; title=&#34;Direct link to heading&#34;&gt;#&lt;/a&gt;&#xA;&lt;/h3&gt;&lt;blockquote&gt;&#xA;&lt;p&gt;DeepSeek-V3.2 引入的 &lt;strong&gt;DSA（DeepSeek Sparse Attention）&lt;/strong&gt; 直接解决计算瓶颈：不再计算所有 token 的注意力，而是只选择 Top-K 个最重要的历史 token。闪电索引器 &lt;strong&gt;(Lightning Indexer）&lt;/strong&gt; 是一个轻量级的注意力模块，为每个 query 快速计算与所有 key 的粗粒度相关性分数，然后通过 &lt;strong&gt;Top-K Selector&lt;/strong&gt; 选出 top-k 个最相关的 token 索引。&lt;/p&gt;</description>
+			</item>
+	</channel>
+</rss>

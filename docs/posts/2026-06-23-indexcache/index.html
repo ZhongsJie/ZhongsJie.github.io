@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="zh-cn"ZgotmplZ>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    
+    <title>IndexCache：DeepSeek 稀疏注意力中的跨层索引复用 | Atomage&#39;s Blog</title>
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="description" content="
+
+    技术背景#
+
+    MLA 已经解决了 KV Cache 存储问题#
+DeepSeek-V2 提出的 MLA（Multi-head Latent Attention） 将 KV Cache 压缩到了极低的水平：
+
+每 token 仅缓存 576 个元素（512 维压缩隐向量 &#43; 64 维 RoPE 分量）
+相当于 MHA 的 1.76%
+128K 上下文下，FP8 KV Cache 仅需 8.72 GB（对比 Llama-70B 的 343 GB）
+
+MLA 的压缩技巧在于：K 和 V 共享一个低秩隐向量 $c_t^{KV} \in \mathbb{R}^{512}$，推理时通过矩阵吸收技巧避免显式恢复高维 K/V。但是，MLA 仍然是全注意力——每个 query token 仍然要计算与所有历史 token 的注意力分数。当上下文长度增长到 128K 以上时，注意力计算量本身成为新瓶颈。
+
+    从全注意力到稀疏注意力#
+
+DeepSeek-V3.2 引入的 DSA（DeepSeek Sparse Attention） 直接解决计算瓶颈：不再计算所有 token 的注意力，而是只选择 Top-K 个最重要的历史 token。闪电索引器 (Lightning Indexer） 是一个轻量级的注意力模块，为每个 query 快速计算与所有 key 的粗粒度相关性分数，然后通过 Top-K Selector 选出 top-k 个最相关的 token 索引。">
+    <meta name="generator" content="Hugo 0.163.3">
+    
+    
+    
+    
+      <meta name="robots" content="index, follow">
+    
+
+    
+<link rel="stylesheet" href="../../ananke/css/main.min.65a4ba9d742b05c115846d8e06cf4714294b7ebf3dd26b492a84a9e3cc66923d.css" >
+
+
+
+    
+
+    
+    
+      
+<link rel="shortcut icon" href="../../images/logo.svg" type="image/x-icon" />
+
+
+    
+
+    
+    
+    <meta property="og:url" content="https://blogs.atomage.cn/posts/2026-06-23-indexcache/">
+	<meta property="og:site_name" content="Atomage&#39;s Blog">
+	<meta property="og:title" content="IndexCache：DeepSeek 稀疏注意力中的跨层索引复用">
+	<meta property="og:description" content="技术背景# MLA 已经解决了 KV Cache 存储问题# DeepSeek-V2 提出的 MLA（Multi-head Latent Attention） 将 KV Cache 压缩到了极低的水平：
+每 token 仅缓存 576 个元素（512 维压缩隐向量 &#43; 64 维 RoPE 分量） 相当于 MHA 的 1.76% 128K 上下文下，FP8 KV Cache 仅需 8.72 GB（对比 Llama-70B 的 343 GB） MLA 的压缩技巧在于：K 和 V 共享一个低秩隐向量 $c_t^{KV} \in \mathbb{R}^{512}$，推理时通过矩阵吸收技巧避免显式恢复高维 K/V。但是，MLA 仍然是全注意力——每个 query token 仍然要计算与所有历史 token 的注意力分数。当上下文长度增长到 128K 以上时，注意力计算量本身成为新瓶颈。
+从全注意力到稀疏注意力# DeepSeek-V3.2 引入的 DSA（DeepSeek Sparse Attention） 直接解决计算瓶颈：不再计算所有 token 的注意力，而是只选择 Top-K 个最重要的历史 token。闪电索引器 (Lightning Indexer） 是一个轻量级的注意力模块，为每个 query 快速计算与所有 key 的粗粒度相关性分数，然后通过 Top-K Selector 选出 top-k 个最相关的 token 索引。">
+	<meta property="og:locale" content="zh_cn">
+	<meta property="og:type" content="article">
+		<meta property="article:section" content="posts">
+		<meta property="article:published_time" content="2026-06-23T09:05:11+08:00">
+		<meta property="article:modified_time" content="2026-06-23T09:05:11+08:00">
+		<meta property="article:tag" content="Deepseek">
+		<meta property="article:tag" content="DSA">
+		<meta property="article:tag" content="Sparse-Attention">
+		<meta property="article:tag" content="IndexCache">
+		<meta property="article:tag" content="VLLM">
+
+	<meta itemprop="name" content="IndexCache：DeepSeek 稀疏注意力中的跨层索引复用">
+	<meta itemprop="description" content="技术背景# MLA 已经解决了 KV Cache 存储问题# DeepSeek-V2 提出的 MLA（Multi-head Latent Attention） 将 KV Cache 压缩到了极低的水平：
+每 token 仅缓存 576 个元素（512 维压缩隐向量 &#43; 64 维 RoPE 分量） 相当于 MHA 的 1.76% 128K 上下文下，FP8 KV Cache 仅需 8.72 GB（对比 Llama-70B 的 343 GB） MLA 的压缩技巧在于：K 和 V 共享一个低秩隐向量 $c_t^{KV} \in \mathbb{R}^{512}$，推理时通过矩阵吸收技巧避免显式恢复高维 K/V。但是，MLA 仍然是全注意力——每个 query token 仍然要计算与所有历史 token 的注意力分数。当上下文长度增长到 128K 以上时，注意力计算量本身成为新瓶颈。
+从全注意力到稀疏注意力# DeepSeek-V3.2 引入的 DSA（DeepSeek Sparse Attention） 直接解决计算瓶颈：不再计算所有 token 的注意力，而是只选择 Top-K 个最重要的历史 token。闪电索引器 (Lightning Indexer） 是一个轻量级的注意力模块，为每个 query 快速计算与所有 key 的粗粒度相关性分数，然后通过 Top-K Selector 选出 top-k 个最相关的 token 索引。">
+	<meta itemprop="datePublished" content="2026-06-23T09:05:11+08:00">
+	<meta itemprop="dateModified" content="2026-06-23T09:05:11+08:00">
+	<meta itemprop="wordCount" content="5812">
+	<meta itemprop="keywords" content="Deepseek,DSA,Sparse-Attention,IndexCache,VLLM">
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content="IndexCache：DeepSeek 稀疏注意力中的跨层索引复用">
+	<meta name="twitter:description" content="技术背景# MLA 已经解决了 KV Cache 存储问题# DeepSeek-V2 提出的 MLA（Multi-head Latent Attention） 将 KV Cache 压缩到了极低的水平：
+每 token 仅缓存 576 个元素（512 维压缩隐向量 &#43; 64 维 RoPE 分量） 相当于 MHA 的 1.76% 128K 上下文下，FP8 KV Cache 仅需 8.72 GB（对比 Llama-70B 的 343 GB） MLA 的压缩技巧在于：K 和 V 共享一个低秩隐向量 $c_t^{KV} \in \mathbb{R}^{512}$，推理时通过矩阵吸收技巧避免显式恢复高维 K/V。但是，MLA 仍然是全注意力——每个 query token 仍然要计算与所有历史 token 的注意力分数。当上下文长度增长到 128K 以上时，注意力计算量本身成为新瓶颈。
+从全注意力到稀疏注意力# DeepSeek-V3.2 引入的 DSA（DeepSeek Sparse Attention） 直接解决计算瓶颈：不再计算所有 token 的注意力，而是只选择 Top-K 个最重要的历史 token。闪电索引器 (Lightning Indexer） 是一个轻量级的注意力模块，为每个 query 快速计算与所有 key 的粗粒度相关性分数，然后通过 Top-K Selector 选出 top-k 个最相关的 token 索引。">
+
+      
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
+      <script>
+        var doNotTrack = false;
+        if ( true ) {
+          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
+          var doNotTrack = (dnt == "1" || dnt == "yes");
+        }
+        if (!doNotTrack) {
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-HVT9CMYGB1');
+        }
+      </script>
+    
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<style>
+.toc-sidebar {
+    position: sticky;
+    top: 2rem;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+}
+.toc-sidebar nav ul {
+    list-style: none;
+    padding-left: 0;
+}
+.toc-sidebar nav ul li {
+    margin-bottom: 0.35em;
+    line-height: 1.4;
+}
+.toc-sidebar nav ul li a {
+    color: #555;
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+.toc-sidebar nav ul li a:hover {
+    color: #000;
+}
+.toc-sidebar nav ul ul {
+    padding-left: 0.75em;
+}
+.toc-sidebar nav ul ul li a {
+    font-size: 0.8rem;
+    color: #777;
+}
+pre {
+    max-width: 100%;
+    box-sizing: border-box;
+    border-radius: 6px;
+}
+pre code {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+</style>
+
+  </head>
+
+  <body class="ma0 avenir bg-near-white production">
+
+    
+
+  <header>
+    <div class="bg-black">
+      <nav class="pv3 ph3 ph4-ns" role="navigation">
+  <div class="flex-l justify-between items-center center">
+    <a href="../../" class="f3 fw2 hover-white no-underline white-90 dib">
+      
+        <img src="../../images/site-logo.svg" class="w100 mw5-ns" alt="Atomage&#39;s Blog" />
+      
+    </a>
+    <div class="flex-l items-center">
+      
+
+      
+        <ul class="pl0 mr3">
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="../../archives/" title="⏱️Archives page">
+              ⏱️Archives
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="../../posts/" title="📎Posts page">
+              📎Posts
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="../../about/" title="🙋🏻‍♂️About page">
+              🙋🏻‍♂️About
+            </a>
+          </li>
+          
+        </ul>
+      
+      
+<div class="ananke-socials">
+  
+    
+    <a href="https://github.com/ZhongsJie" target="_blank" rel="noopener" class="github ananke-social-link link-transition stackoverflow link dib z-999 pt3 pt0-l mr1" title="GitHub link" aria-label="follow on GitHub——Opens in a new window">
+      
+        <span class="icon"><svg style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+</span>
+      
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;"/>
+</svg>
+</span></a>
+  
+</div>
+
+    </div>
+  </div>
+</nav>
+
+    </div>
+  </header>
+
+
+    <main class="pb7" role="main">
+      
+
+<div class="flex-l mt2 mw9 center">
+  <article class="flex-l justify-between center ph3">
+    <aside class="w-20-l pr4-l dn db-l toc-sidebar">
+      
+      <div class="nested-list-reset nested-copy-line-height nested-links">
+        <p class="f5 b mb2 mt0">目录</p>
+        <nav id="TableOfContents">
+  <ul>
+    <li><a href="#技术背景">技术背景</a>
+      <ul>
+        <li><a href="#mla-已经解决了-kv-cache-存储问题">MLA 已经解决了 KV Cache 存储问题</a></li>
+        <li><a href="#从全注意力到稀疏注意力">从全注意力到稀疏注意力</a></li>
+      </ul>
+    </li>
+    <li><a href="#跨层索引的冗余">跨层索引的冗余</a></li>
+    <li><a href="#fs-分层--跨层复用索引">F/S 分层 + 跨层复用索引</a>
+      <ul>
+        <li><a href="#training-aware-indexcache">Training-aware IndexCache</a></li>
+      </ul>
+    </li>
+    <li><a href="#和-kv-cache-的关系">和 KV Cache 的关系</a></li>
+    <li><a href="#源码分析">源码分析</a>
+      <ul>
+        <li><a href="#模型识别与缓存配置">模型识别与缓存配置</a></li>
+        <li><a href="#deepseekv32indexercacheindexer-的分页-k-cache-声明"><code>DeepseekV32IndexerCache</code>：Indexer 的分页 K cache 声明</a></li>
+        <li><a href="#indexer-k-cache-的物理布局">Indexer K cache 的物理布局</a></li>
+        <li><a href="#indexer-结构">Indexer 结构</a></li>
+        <li><a href="#indexer-前向计算">Indexer 前向计算</a></li>
+        <li><a href="#return-selfindexer_op"><code>return self.indexer_op(...)</code></a></li>
+        <li><a href="#sparseattnindexer-custom-op"><code>SparseAttnIndexer</code> Custom Op</a></li>
+        <li><a href="#indexer-metadata">Indexer metadata</a></li>
+        <li><a href="#indexcache-配置决定哪些层刷新-top-k">IndexCache 配置：决定哪些层刷新 top-k</a></li>
+        <li><a href="#模型级共享-topk_indices_buffer">模型级共享 <code>topk_indices_buffer</code></a></li>
+        <li><a href="#attention-中的-fullshared-分支">Attention 中的 Full/Shared 分支</a></li>
+      </ul>
+    </li>
+    <li><a href="#参考">参考</a></li>
+  </ul>
+</nav>
+      </div>
+      
+    </aside>
+
+    <div class="w-80-l">
+      <header class="mb4">
+        <p class="f6 b helvetica tracked mt0">
+          POSTS
+        </p>
+        <h1 class="f1 mt2 mb2">
+          IndexCache：DeepSeek 稀疏注意力中的跨层索引复用
+        </h1>
+        
+        <p class="tracked mt2 mb1">
+          By <strong>
+            
+            ZhongsJie
+            
+          </strong>
+        </p>
+        
+        <time class="f6 dib tracked" datetime="2026-06-23T09:05:11+08:00" >June 23, 2026</time>
+        
+        <span class="f6 dib tracked"> - 12 minutes read</span>
+        <span class="f6 dib tracked"> - 5812 words</span>
+        
+        <div class="mt2"><ul class="pa0">
+  
+   <li class="list di">
+     <a href="../../tags/deepseek/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">Deepseek</a>
+   </li>
+  
+   <li class="list di">
+     <a href="../../tags/dsa/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">DSA</a>
+   </li>
+  
+   <li class="list di">
+     <a href="../../tags/sparse-attention/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">Sparse-Attention</a>
+   </li>
+  
+   <li class="list di">
+     <a href="../../tags/indexcache/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">IndexCache</a>
+   </li>
+  
+   <li class="list di">
+     <a href="../../tags/vllm/" class="link f5 grow no-underline br-pill ba ph3 pv2 mb2 dib black sans-serif">VLLM</a>
+   </li>
+  
+</ul>
+</div>
+      </header>
+
+      <div class="nested-copy-line-height lh-copy f4 nested-links nested-img mid-gray">
+        <p><img src="../../images/2026-06/indexcache-layer-similarity.png" alt=""></p>
+<h2 id="技术背景">
+    技术背景<a class="hash-link" href="#%e6%8a%80%e6%9c%af%e8%83%8c%e6%99%af" title="Direct link to heading">#</a>
+</h2><h3 id="mla-已经解决了-kv-cache-存储问题">
+    MLA 已经解决了 KV Cache 存储问题<a class="hash-link" href="#mla-%e5%b7%b2%e7%bb%8f%e8%a7%a3%e5%86%b3%e4%ba%86-kv-cache-%e5%ad%98%e5%82%a8%e9%97%ae%e9%a2%98" title="Direct link to heading">#</a>
+</h3><p>DeepSeek-V2 提出的 <strong>MLA（Multi-head Latent Attention）</strong> 将 KV Cache 压缩到了极低的水平：</p>
+<ul>
+<li>每 token 仅缓存 <strong>576 个元素</strong>（512 维压缩隐向量 + 64 维 RoPE 分量）</li>
+<li>相当于 MHA 的 <strong>1.76%</strong></li>
+<li>128K 上下文下，FP8 KV Cache 仅需 <strong>8.72 GB</strong>（对比 Llama-70B 的 343 GB）</li>
+</ul>
+<p>MLA 的压缩技巧在于：K 和 V 共享一个低秩隐向量 $c_t^{KV} \in \mathbb{R}^{512}$，推理时通过矩阵吸收技巧避免显式恢复高维 K/V。但是，MLA 仍然是<strong>全注意力</strong>——每个 query token 仍然要计算与所有历史 token 的注意力分数。当上下文长度增长到 128K 以上时，注意力计算量本身成为新瓶颈。</p>
+<h3 id="从全注意力到稀疏注意力">
+    从全注意力到稀疏注意力<a class="hash-link" href="#%e4%bb%8e%e5%85%a8%e6%b3%a8%e6%84%8f%e5%8a%9b%e5%88%b0%e7%a8%80%e7%96%8f%e6%b3%a8%e6%84%8f%e5%8a%9b" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>DeepSeek-V3.2 引入的 <strong>DSA（DeepSeek Sparse Attention）</strong> 直接解决计算瓶颈：不再计算所有 token 的注意力，而是只选择 Top-K 个最重要的历史 token。闪电索引器 <strong>(Lightning Indexer）</strong> 是一个轻量级的注意力模块，为每个 query 快速计算与所有 key 的粗粒度相关性分数，然后通过 <strong>Top-K Selector</strong> 选出 top-k 个最相关的 token 索引。</p>
+</blockquote>
+<p><strong>细粒度 token 选择机制</strong>仅检索与 top-$k$ 索引分数对应的键值条目 $\{c_s\}$，通过在查询 token $h_t$ 与稀疏选择出的键值条目 $\{c_s\}$ 之间应用注意力机制，计算注意力输出 $u_t$：</p>
+$$
+u_t = \mathrm{Attn}\left( h_t, \left\{ c_s \mid I_{t,s} \in \mathrm{Top}\text{-}k(I_{t,:}) \right\} \right)
+$$<p>但这里引入了一个新问题：索引器仍需要对所有 $L$ 个 token 做一次完整的注意力计算，且<strong>每步都要重新选择 Top-K token</strong>。</p>
+<p><img src="../../images/2026-06/indexcache-indexer-time.png" alt=""></p>
+<ul>
+<li>在 30B 参数的 DSA 模型上，索引器（Lightning Indexer）的时间占比随上下文长度的变化。</li>
+</ul>
+<p>在 200K 上下文长度下，预填充阶段有高达 81% 的时间花在索引器上！这意味着，尽管核心注意力已经被稀疏化了，但索引器的 $O(L^2)$ 计算反而成了新的瓶颈。上下文越长，索引器的瓶颈越突出。</p>
+<ul>
+<li>这就是 IndexCache 要解决的问题：<strong>能否在不显著损失质量的前提下，大幅减少索引器的计算量？</strong></li>
+</ul>
+<h2 id="跨层索引的冗余">
+    跨层索引的冗余<a class="hash-link" href="#%e8%b7%a8%e5%b1%82%e7%b4%a2%e5%bc%95%e7%9a%84%e5%86%97%e4%bd%99" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>相邻层的 top‑k 选择高度相似（相邻层 overlap 在 70%–100%），也就是说&quot;每层都重新算一遍 indexer&quot;其实高度冗余。</p>
+</blockquote>
+<p><img src="../../images/2026-06/indexcache-heatmap.png" alt=""></p>
+<p>这张热力图传递了几个重要信息：</p>
+<ol>
+<li><strong>对角线附近一片亮黄</strong>：相邻层的索引相似度非常高，通常在 70% 以上，很多甚至接近 100%。这意味着第 $\ell$ 层和第 $\ell+1$ 层的索引器，费了同样的计算量，却选出了几乎一模一样的 token 集合。</li>
+<li><strong>存在明显的块状结构</strong>：相似度不是均匀衰减的，而是形成了清晰的&quot;块&quot;——同一个块内的层高度相似，不同块之间的差异较大。这暗示了一种自然的分组结构。</li>
+<li><strong>浅层和深层的差异</strong>：模型的前几层和后几层内部相似度更高（块更大），中间层的块相对更小。</li>
+</ol>
+<p>这个发现的直觉解释是：在深度神经网络中，相邻层的表示（representation）变化通常是平滑的，类似残差网络中的&quot;小步更新&quot;。因此，相邻层的 query 和 key 的分布差异很小，导致它们选出的最相关 token 高度一致。</p>
+<h2 id="fs-分层--跨层复用索引">
+    F/S 分层 + 跨层复用索引<a class="hash-link" href="#fs-%e5%88%86%e5%b1%82--%e8%b7%a8%e5%b1%82%e5%a4%8d%e7%94%a8%e7%b4%a2%e5%bc%95" title="Direct link to heading">#</a>
+</h2><p><strong>概述。</strong> IndexCache 通过将 $N$ 层划分为两种角色来修改 DSA，这种划分被编码为一个二进制模式字符串：</p>
+$$
+\mathbf{c}=c_1c_2\cdots c_N,\quad c_\ell \in \{\mathrm{F}, \mathrm{S}\}
+$$<ul>
+<li><strong>F（Full）</strong>：该层保留自己的 indexer，在所有之前的 token 上重新计算 $\mathcal{T}^{(\ell)}_t$，并在选中的子集上执行稀疏核心注意力，与标准 DSA 完全相同。</li>
+<li><strong>S（Shared）</strong>：该层没有 indexer。它从最近的前置 F 层继承索引集合，即 $\mathcal{T}^{(\ell)}_t \leftarrow \mathcal{T}^{f(\ell)}_t$，其中 $f(\ell)=\max\{j<\ell:c_j=\mathrm{F}\}$，然后直接使用这些继承的索引执行稀疏核心注意力。</li>
+</ul>
+<p>第一层始终为 F，用于生成初始索引。在推理阶段，S 层只需跳过 indexer 的前向计算，并复用其前驱层缓存的索引张量。假设模型有 48 层，如果采用 1/4 的保留率（keep ratio），则只有 12 层是 Full 层，剩下 36 层是 Shared 层。这意味着索引器的计算量直接减少到原来的 1/4。实现上<strong>并没有修改原始 Attention 计算逻辑</strong>，每层 Forward 过程中唯一的变化，仅仅是增加一个条件分支，用于决定是运行 indexer，还是复制缓存索引。</p>
+<p>关键设计问题是如何选择模式 $\mathbf{c}$。如果大多数层都可以安全地共享索引，那么总 indexer 成本中的很大一部分 $O(NL^2)$ 就可以被消除，而核心注意力的计算复杂度 $O(NLk)$ 则保持不变。</p>
+<ul>
+<li><strong>Training-free IndexCache</strong>，它通过在已建立的 DSA 模型上进行贪心搜索来确定 $\mathbf{c}$，不需要任何额外训练，在 1/2 保留率下效果几乎无损；</li>
+<li><strong>Training-aware IndexCache</strong>，它通过多层蒸馏损失联合优化用于跨层共享的 indexer 参数，用于提升在 1/4 保留率场景下的质量。</li>
+</ul>
+<h3 id="training-aware-indexcache">
+    Training-aware IndexCache<a class="hash-link" href="#training-aware-indexcache" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>无需训练的 IndexCache 不需要更新权重，但它的局限在于：每个 indexer 最初都只被训练用于服务其所在的单层。当从头训练 DSA 模型，或继续进行预训练时，同时显式地训练每个保留下来的 indexer，使其能够同时服务多个层。</p>
+</blockquote>
+<p><strong>从单层蒸馏到多层蒸馏。</strong> 在标准 DSA 训练中，第 $\ell$ 层的每个 indexer 都会通过 KL 散度，相对于其自身层的聚合注意力分布 $p_t^{(\ell)}$ 进行蒸馏：</p>
+$$
+\mathcal{L}^{\ell}=\sum_t D_{\mathrm{KL}}\left(p_t^{(\ell)} \parallel q_t^{(\ell)}\right)
+$$<p>将其推广为一个多层目标。设第 $\ell$ 层是一个保留下来的 F 层，并设第 $\ell+1,\ldots,\ell+m$ 层是后续的 S 层，它们将复用该层的索引集合 $\mathcal{T}^{(\ell)}$。多层蒸馏损失为：</p>
+$$
+\mathcal{L}^{\ell}_{\mathrm{multi}} = \sum_{j=0}^{m} \frac{1}{m+1} \sum_t D_{\mathrm{KL}} \left( p_t^{(\ell+j)} \parallel q_t^{(\ell)} \right)
+$$<p>直观地看，这会鼓励 indexer 预测一个 top-$k$ 集合，使其对该 indexer 所服务的所有层都有联合价值，而不是仅仅过拟合到第 $\ell$ 层本身。</p>
+<p><strong>与针对平均分布进行蒸馏的梯度等价性。</strong> 一个自然的担忧是，优化多个 KL 项之和是否会引入意外的相互作用。我们证明，多层损失具有一个清晰的解释：它产生的梯度与针对单个平均目标进行蒸馏时<strong>完全相同</strong>。如果只最小化 Full 层自身的注意力分布变化，Full 层的索引器会倾向于&quot;自私地&quot;优化自己的表现，而忽略 Shared 层的需求。<strong>多层蒸馏让索引器学会兼顾所有被服务层</strong>。</p>
+<p><img src="../../images/2026-06/indexcache-speedup.png" alt=""></p>
+<ul>
+<li><strong>上下文越长，加速比越大</strong>。上下文越长，索引器的 $O(L^2)$ 计算在总计算中的占比越大，削减索引器带来的收益也越大。</li>
+</ul>
+<h2 id="和-kv-cache-的关系">
+    和 KV Cache 的关系<a class="hash-link" href="#%e5%92%8c-kv-cache-%e7%9a%84%e5%85%b3%e7%b3%bb" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>在标准的自回归解码中，每一层都会维护一个 KV Cache（缓存所有已生成 token 的 key 和 value）。IndexCache 在此基础上额外缓存一份&quot;索引 Cache&quot;——即 Full 层选出的 top-k token 位置索引。<strong>vLLM 实现了 paged indexer K cache，并用一个共享的瞬态 top-k buffer 连接 indexer 与 sparse MLA。</strong></p>
+</blockquote>
+<p>两种 Cache 的生命周期不同：</p>
+<ul>
+<li><strong>KV Cache</strong>：随着每个新 token 的生成不断增长。</li>
+<li><strong>Index Cache</strong>：在 Full 层计算后写入，在后续的 Shared 层读取使用，直到遇到下一个 Full 层才更新。</li>
+</ul>
+<p>在 Prefill 阶段，所有层按顺序处理，Index Cache 自然地被逐层传递。在 Decode 阶段，由于每次只处理一个新 token，Full 层需要为这个新 token 重新计算索引（因为新 token 与历史 token 的相关性分布可能不同），但 Shared 层仍可复用。</p>
+<h2 id="源码分析">
+    源码分析<a class="hash-link" href="#%e6%ba%90%e7%a0%81%e5%88%86%e6%9e%90" title="Direct link to heading">#</a>
+</h2><blockquote>
+<p>以下分析基于 vLLM <code>main@f2069b005b815e8a1b44381712dc951157c42ad4</code>。需要先区分三个对象：<code>DeepseekV32IndexerCache</code> 保存每层自己的历史 Indexer K；<code>topk_indices_buffer</code> 保存当前 token 的 top-k 位置；IndexCache 策略通过让 Shared 层不覆盖该 buffer，实现跨层索引复用。</p>
+</blockquote>
+<h3 id="模型识别与缓存配置">
+    模型识别与缓存配置<a class="hash-link" href="#%e6%a8%a1%e5%9e%8b%e8%af%86%e5%88%ab%e4%b8%8e%e7%bc%93%e5%ad%98%e9%85%8d%e7%bd%ae" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DeepseekV32ForCausalLM</span>(VerifyAndUpdateConfig):
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">@classmethod</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">verify_and_update_config</span>(cls, vllm_config: <span style="color:#e6db74">&#34;VllmConfig&#34;</span>) <span style="color:#f92672">-&gt;</span> <span style="color:#66d9ef">None</span>:
+</span></span><span style="display:flex;"><span>        hf_config <span style="color:#f92672">=</span> vllm_config<span style="color:#f92672">.</span>model_config<span style="color:#f92672">.</span>hf_config
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># index_topk 是当前实现识别 DeepSeek V3.2 DSA 的关键配置字段。</span>
+</span></span><span style="display:flex;"><span>        is_v32 <span style="color:#f92672">=</span> hasattr(hf_config, <span style="color:#e6db74">&#34;index_topk&#34;</span>)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">assert</span> is_v32
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        cache_config <span style="color:#f92672">=</span> vllm_config<span style="color:#f92672">.</span>cache_config
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> cache_config<span style="color:#f92672">.</span>cache_dtype <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;bfloat16&#34;</span>:
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># 将显式 BF16 改成 auto，后续由 sparse MLA 后端确定实际布局。</span>
+</span></span><span style="display:flex;"><span>            cache_config<span style="color:#f92672">.</span>cache_dtype <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;auto&#34;</span>
+</span></span><span style="display:flex;"><span>            logger<span style="color:#f92672">.</span>info(<span style="color:#e6db74">&#34;Using bfloat16 kv-cache for DeepSeekV3.2&#34;</span>)
+</span></span></code></pre></div><ul>
+<li><code>DeepseekV32ForCausalLM</code> 位于模型配置适配层，不是实际推理模型类。</li>
+<li><code>index_topk</code> 既用于识别 V3.2 DSA，也决定每个 query 最终保留的历史位置数量。</li>
+<li>这里修改的是主 attention cache 的配置入口，与后文的 Indexer K cache 不是同一个 cache。</li>
+</ul>
+<h3 id="deepseekv32indexercacheindexer-的分页-k-cache-声明">
+    <code>DeepseekV32IndexerCache</code>：Indexer 的分页 K cache 声明<a class="hash-link" href="#deepseekv32indexercacheindexer-%e7%9a%84%e5%88%86%e9%a1%b5-k-cache-%e5%a3%b0%e6%98%8e" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DeepseekV32IndexerCache</span>(torch<span style="color:#f92672">.</span>nn<span style="color:#f92672">.</span>Module, AttentionLayerBase):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">__init__</span>(self, head_dim, dtype, prefix, cache_config):
+</span></span><span style="display:flex;"><span>        super()<span style="color:#f92672">.</span><span style="color:#a6e22e">__init__</span>()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 初始化时只是占位；真实分页 cache 由 vLLM KV cache 管理器分配并绑定。</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>kv_cache <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>tensor([])
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>head_dim <span style="color:#f92672">=</span> head_dim
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>prefix <span style="color:#f92672">=</span> prefix
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>cache_config <span style="color:#f92672">=</span> cache_config
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>dtype <span style="color:#f92672">=</span> dtype
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 注册为 attention layer，使调度器能够为它建立 cache 和 metadata。</span>
+</span></span><span style="display:flex;"><span>        compilation_config <span style="color:#f92672">=</span> get_current_vllm_config()<span style="color:#f92672">.</span>compilation_config
+</span></span><span style="display:flex;"><span>        compilation_config<span style="color:#f92672">.</span>static_forward_context[prefix] <span style="color:#f92672">=</span> self
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_kv_cache_spec</span>(self, vllm_config: VllmConfig) <span style="color:#f92672">-&gt;</span> KVCacheSpec:
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> MLAAttentionSpec(
+</span></span><span style="display:flex;"><span>            block_size<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>cache_config<span style="color:#f92672">.</span>block_size,
+</span></span><span style="display:flex;"><span>            num_kv_heads<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>,      <span style="color:#75715e"># 64 个 Indexer Query heads 共享一份历史 K。</span>
+</span></span><span style="display:flex;"><span>            head_size<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>head_dim,
+</span></span><span style="display:flex;"><span>            dtype<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>dtype,
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_attn_backend</span>(self) <span style="color:#f92672">-&gt;</span> AttentionBackend:
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 后端负责物理布局、slot mapping、block table 和 prefill/decode metadata。</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> DeepseekV32IndexerBackend
+</span></span></code></pre></div><ul>
+<li>类名中虽然有 <code>Cache</code>，但它不是跨层 IndexCache 策略本身。</li>
+<li>它是一个 <code>AttentionLayerBase</code>，向 vLLM 声明&quot;该 Indexer 层需要一份分页 K cache&quot;。</li>
+<li>这里只有一个向量，没有普通 attention 中相互独立的 K/V 两个向量。</li>
+<li><code>num_kv_heads=1</code> 表示 Indexer 使用 MQA 形式：多个 Query heads 共享一个 K。</li>
+<li>每个保留 Indexer 的 transformer 层拥有自己的 <code>DeepseekV32IndexerCache</code>；它不在 transformer 层之间共享。</li>
+</ul>
+<h3 id="indexer-k-cache-的物理布局">
+    Indexer K cache 的物理布局<a class="hash-link" href="#indexer-k-cache-%e7%9a%84%e7%89%a9%e7%90%86%e5%b8%83%e5%b1%80" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DeepseekV32IndexerBackend</span>(AttentionBackend):
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">@staticmethod</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_name</span>() <span style="color:#f92672">-&gt;</span> str:
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> <span style="color:#e6db74">&#34;DEEPSEEK_V32_INDEXER&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">@staticmethod</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_kv_cache_shape</span>(
+</span></span><span style="display:flex;"><span>        num_blocks,
+</span></span><span style="display:flex;"><span>        block_size,
+</span></span><span style="display:flex;"><span>        num_kv_heads,
+</span></span><span style="display:flex;"><span>        head_size,
+</span></span><span style="display:flex;"><span>        cache_dtype_str<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;auto&#34;</span>,
+</span></span><span style="display:flex;"><span>    ):
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">assert</span> num_kv_heads <span style="color:#f92672">==</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 每个分页位置只保存一份共享 K，不额外增加 V 维度。</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> (num_blocks, block_size, head_size)
+</span></span></code></pre></div><ul>
+<li>当前 V3.2 Indexer 的逻辑 K 维度为 128。</li>
+<li>FP8 cache 为每个 token 保存 128 bytes K 和一个 4 bytes scale，因此构造 cache spec 时使用 <code>head_dim=132</code>、<code>dtype=torch.uint8</code>。</li>
+<li>该 cache 随序列增长，用于下一 token 的全历史检索；它的生命周期类似 KV cache，而不是只在相邻层之间短暂存在。</li>
+</ul>
+<h3 id="indexer-结构">
+    Indexer 结构<a class="hash-link" href="#indexer-%e7%bb%93%e6%9e%84" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Indexer</span>(nn<span style="color:#f92672">.</span>Module):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">__init__</span>(self, vllm_config, config, hidden_size, q_lora_rank,
+</span></span><span style="display:flex;"><span>                 quant_config, cache_config, topk_indices_buffer, prefix,
+</span></span><span style="display:flex;"><span>                 is_inplace_rope<span style="color:#f92672">=</span><span style="color:#66d9ef">False</span>):
+</span></span><span style="display:flex;"><span>        super()<span style="color:#f92672">.</span><span style="color:#a6e22e">__init__</span>()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>topk_tokens <span style="color:#f92672">=</span> config<span style="color:#f92672">.</span>index_topk
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>n_head <span style="color:#f92672">=</span> config<span style="color:#f92672">.</span>index_n_heads       <span style="color:#75715e"># 通常为 64 个 Indexer Query heads。</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>head_dim <span style="color:#f92672">=</span> config<span style="color:#f92672">.</span>index_head_dim    <span style="color:#75715e"># 通常为 128。</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>rope_dim <span style="color:#f92672">=</span> config<span style="color:#f92672">.</span>qk_rope_head_dim  <span style="color:#75715e"># RoPE 子空间通常为 64。</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 从主 MLA 的 query latent 生成多头 Indexer Query。</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>wq_b <span style="color:#f92672">=</span> ReplicatedLinear(
+</span></span><span style="display:flex;"><span>            q_lora_rank,
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>head_dim <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>n_head,
+</span></span><span style="display:flex;"><span>            bias<span style="color:#f92672">=</span><span style="color:#66d9ef">False</span>,
+</span></span><span style="display:flex;"><span>            quant_config<span style="color:#f92672">=</span>quant_config,
+</span></span><span style="display:flex;"><span>            prefix<span style="color:#f92672">=</span><span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{</span>prefix<span style="color:#e6db74">}</span><span style="color:#e6db74">.wq_b&#34;</span>,
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 一次 GEMM 同时生成共享 K 和各 Query head 的聚合权重。</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Fused wk + weights_proj: single GEMM producing [head_dim + n_head].</span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>wk_weights_proj <span style="color:#f92672">=</span> MergedColumnParallelLinear(
+</span></span><span style="display:flex;"><span>            hidden_size,
+</span></span><span style="display:flex;"><span>            [self<span style="color:#f92672">.</span>head_dim, self<span style="color:#f92672">.</span>n_head],
+</span></span><span style="display:flex;"><span>            bias<span style="color:#f92672">=</span><span style="color:#66d9ef">False</span>,
+</span></span><span style="display:flex;"><span>            quant_config<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>            disable_tp<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>,
+</span></span><span style="display:flex;"><span>            prefix<span style="color:#f92672">=</span><span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{</span>prefix<span style="color:#e6db74">}</span><span style="color:#e6db74">.wk_weights_proj&#34;</span>,
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>k_norm <span style="color:#f92672">=</span> LayerNorm(self<span style="color:#f92672">.</span>head_dim, eps<span style="color:#f92672">=</span><span style="color:#ae81ff">1e-6</span>)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>topk_indices_buffer <span style="color:#f92672">=</span> topk_indices_buffer
+</span></span></code></pre></div><ul>
+<li><code>index_n_heads/index_head_dim</code> 属于 Lightning Indexer，不等于主 MLA attention 的 head 配置。</li>
+<li><code>weights_proj</code> 不是 Value 投影，它给多个 Indexer Query heads 的相关性分数提供聚合权重。</li>
+<li><code>wk</code> 和 <code>weights_proj</code> 被融合为一个 GEMM，输出 <code>[head_dim + n_head]</code>，减少一次投影开销。</li>
+<li><code>disable_tp=True</code> 表示 indexer 投影在 tensor parallel 上复制，不切分。</li>
+</ul>
+<p>Indexer 随后创建自己的分页 K cache，并将它交给 <code>SparseAttnIndexer</code>：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># FP8 naive cache：128 bytes K + 4 bytes FP32 scale。</span>
+</span></span><span style="display:flex;"><span>self<span style="color:#f92672">.</span>k_cache <span style="color:#f92672">=</span> DeepseekV32IndexerCache(
+</span></span><span style="display:flex;"><span>    head_dim<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>head_dim <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>head_dim <span style="color:#f92672">//</span> self<span style="color:#f92672">.</span>quant_block_size <span style="color:#f92672">*</span> <span style="color:#ae81ff">4</span>,
+</span></span><span style="display:flex;"><span>    dtype<span style="color:#f92672">=</span>torch<span style="color:#f92672">.</span>uint8,
+</span></span><span style="display:flex;"><span>    prefix<span style="color:#f92672">=</span><span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{</span>prefix<span style="color:#e6db74">}</span><span style="color:#e6db74">.k_cache&#34;</span>,
+</span></span><span style="display:flex;"><span>    cache_config<span style="color:#f92672">=</span>cache_config,
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>self<span style="color:#f92672">.</span>indexer_op <span style="color:#f92672">=</span> SparseAttnIndexer(
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>k_cache,               <span style="color:#75715e"># 历史检索 K 的分页 cache。</span>
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>quant_block_size,
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>scale_fmt,
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>topk_tokens,
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>head_dim,
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>max_model_len,
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>max_total_seq_len,
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>topk_indices_buffer,   <span style="color:#75715e"># 跨层共享的是这个 top-k 结果 buffer。</span>
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><ul>
+<li><strong>DeepseekV32IndexerCache</strong>：保存本层所有历史 token 的 Indexer K</li>
+<li><strong>SparseAttnIndexer</strong>：读取该 K cache，计算得分并写 topk_indices_buffer</li>
+</ul>
+<h3 id="indexer-前向计算">
+    Indexer 前向计算<a class="hash-link" href="#indexer-%e5%89%8d%e5%90%91%e8%ae%a1%e7%ae%97" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward</span>(self, hidden_states, qr, positions, rotary_emb) <span style="color:#f92672">-&gt;</span> torch<span style="color:#f92672">.</span>Tensor:
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># qr 是主 MLA 产生的 query latent q_c。</span>
+</span></span><span style="display:flex;"><span>    q, _ <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>wq_b(qr)
+</span></span><span style="display:flex;"><span>    q <span style="color:#f92672">=</span> q<span style="color:#f92672">.</span>view(<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>, self<span style="color:#f92672">.</span>n_head, self<span style="color:#f92672">.</span>head_dim)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    q_pe, q_nope <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>split(
+</span></span><span style="display:flex;"><span>        q,
+</span></span><span style="display:flex;"><span>        [self<span style="color:#f92672">.</span>rope_dim, self<span style="color:#f92672">.</span>head_dim <span style="color:#f92672">-</span> self<span style="color:#f92672">.</span>rope_dim],
+</span></span><span style="display:flex;"><span>        dim<span style="color:#f92672">=-</span><span style="color:#ae81ff">1</span>,
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 一次融合投影得到共享 K 和每个 Query head 的权重。</span>
+</span></span><span style="display:flex;"><span>    kw, _ <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>wk_weights_proj(hidden_states)
+</span></span><span style="display:flex;"><span>    k <span style="color:#f92672">=</span> kw[:, : self<span style="color:#f92672">.</span>head_dim]
+</span></span><span style="display:flex;"><span>    weights <span style="color:#f92672">=</span> kw[:, self<span style="color:#f92672">.</span>head_dim :]
+</span></span><span style="display:flex;"><span>    k <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>k_norm(k)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    k_pe, k_nope <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>split(
+</span></span><span style="display:flex;"><span>        k,
+</span></span><span style="display:flex;"><span>        [self<span style="color:#f92672">.</span>rope_dim, self<span style="color:#f92672">.</span>head_dim <span style="color:#f92672">-</span> self<span style="color:#f92672">.</span>rope_dim],
+</span></span><span style="display:flex;"><span>        dim<span style="color:#f92672">=-</span><span style="color:#ae81ff">1</span>,
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 只旋转 PE 子空间；K 增加一个共享 KV-head 维度以匹配 MQA。</span>
+</span></span><span style="display:flex;"><span>    q_pe, k_pe <span style="color:#f92672">=</span> rotary_emb(positions, q_pe, k_pe<span style="color:#f92672">.</span>unsqueeze(<span style="color:#ae81ff">1</span>))
+</span></span><span style="display:flex;"><span>    q <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>cat([q_pe, q_nope], dim<span style="color:#f92672">=-</span><span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>    k <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>cat([k_pe<span style="color:#f92672">.</span>squeeze(<span style="color:#f92672">-</span><span style="color:#ae81ff">2</span>), k_nope], dim<span style="color:#f92672">=-</span><span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Q 在 Python 层量化；K 的量化与 paged-cache 写入在底层融合完成。</span>
+</span></span><span style="display:flex;"><span>    q_fp8, q_scale <span style="color:#f92672">=</span> per_token_group_quant_fp8(
+</span></span><span style="display:flex;"><span>        q<span style="color:#f92672">.</span>view(<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>, self<span style="color:#f92672">.</span>head_dim),
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>quant_block_size,
+</span></span><span style="display:flex;"><span>        column_major_scales<span style="color:#f92672">=</span><span style="color:#66d9ef">False</span>,
+</span></span><span style="display:flex;"><span>        use_ue8m0<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>,
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>    q_fp8 <span style="color:#f92672">=</span> q_fp8<span style="color:#f92672">.</span>view(<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>, self<span style="color:#f92672">.</span>n_head, self<span style="color:#f92672">.</span>head_dim)
+</span></span><span style="display:flex;"><span>    q_scale <span style="color:#f92672">=</span> q_scale<span style="color:#f92672">.</span>view(<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>, self<span style="color:#f92672">.</span>n_head, <span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 将 Q scale、点积缩放和多头归一化折叠进 weights。</span>
+</span></span><span style="display:flex;"><span>    weights <span style="color:#f92672">=</span> (
+</span></span><span style="display:flex;"><span>        weights<span style="color:#f92672">.</span>unsqueeze(<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">*</span> q_scale
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>softmax_scale
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>n_head<span style="color:#f92672">**-</span><span style="color:#ae81ff">0.5</span>
+</span></span><span style="display:flex;"><span>    )<span style="color:#f92672">.</span>squeeze(<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> self<span style="color:#f92672">.</span>indexer_op(hidden_states, q_fp8, k, weights)
+</span></span></code></pre></div><ul>
+<li><code>qr</code> 是 <code>q_c</code>，即主 MLA 的低秩 Query latent，不是最终完成主 attention 投影的 Q。</li>
+<li>Q 和共享 K 都在相同的 RoPE 坐标系中进行检索打分。</li>
+<li>返回值是共享 <code>topk_indices_buffer</code>，不是 attention 输出。</li>
+</ul>
+<h3 id="return-selfindexer_op">
+    <code>return self.indexer_op(...)</code><a class="hash-link" href="#return-selfindexer_op" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">return</span> self<span style="color:#f92672">.</span>indexer_op(
+</span></span><span style="display:flex;"><span>    hidden_states,
+</span></span><span style="display:flex;"><span>    q_fp8,     <span style="color:#75715e"># 当前 token 的多头量化检索 Query。</span>
+</span></span><span style="display:flex;"><span>    k,         <span style="color:#75715e"># 当前 token 的共享检索 K，待量化并写入分页 cache。</span>
+</span></span><span style="display:flex;"><span>    weights,   <span style="color:#75715e"># 聚合多个 Query-head 分数的动态权重。</span>
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><p>在 V3.2 路径中，该调用完成：</p>
+<ol>
+<li>将当前 token 的共享 K 量化并写入本层 <code>DeepseekV32IndexerCache</code>。</li>
+<li>根据 metadata 获取本层的 slot mapping、block table 和序列长度。</li>
+<li>使用当前 Q 对该层的全部历史 Indexer K 计算 MQA logits。</li>
+<li>使用 <code>weights</code> 聚合多 Query heads 的检索分数。</li>
+<li>对每个 query 执行 top-k。</li>
+<li>将局部 token 位置写入模型级 <code>topk_indices_buffer</code> 并返回该 buffer。</li>
+</ol>
+<p><code>hidden_states</code> 主要保留在统一 custom op 接口中，并用于 profiling/fake op 的形状与 token 数信息；实际相关性计算的核心输入是 <code>q_fp8</code>、分页 K cache 和 <code>weights</code>。</p>
+<h3 id="sparseattnindexer-custom-op">
+    <code>SparseAttnIndexer</code> Custom Op<a class="hash-link" href="#sparseattnindexer-custom-op" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#a6e22e">@CustomOp.register</span>(<span style="color:#e6db74">&#34;sparse_attn_indexer&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">SparseAttnIndexer</span>(CustomOp):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward_cuda</span>(self, hidden_states, q_quant, k, weights):
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># V3.2 FP8 路径中 q_quant 是 Tensor，q_scale 已折叠进 weights。</span>
+</span></span><span style="display:flex;"><span>        q_values, q_scale <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>_split_quantized_q(q_quant)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> torch<span style="color:#f92672">.</span>ops<span style="color:#f92672">.</span>vllm<span style="color:#f92672">.</span>sparse_attn_indexer(
+</span></span><span style="display:flex;"><span>            hidden_states,
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>k_cache_prefix,
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>kv_cache,
+</span></span><span style="display:flex;"><span>            q_values,
+</span></span><span style="display:flex;"><span>            q_scale,
+</span></span><span style="display:flex;"><span>            k,
+</span></span><span style="display:flex;"><span>            weights,
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>quant_block_size,
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>scale_fmt,
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>topk_tokens,
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>head_dim,
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>max_model_len,
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>total_seq_lens,
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>topk_indices_buffer,
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>skip_k_cache_insert,
+</span></span><span style="display:flex;"><span>            self<span style="color:#f92672">.</span>use_fp4_cache,
+</span></span><span style="display:flex;"><span>        )
+</span></span></code></pre></div><p>底层算子的共同前置逻辑：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>attn_metadata <span style="color:#f92672">=</span> get_forward_context()<span style="color:#f92672">.</span>attn_metadata
+</span></span><span style="display:flex;"><span>metadata <span style="color:#f92672">=</span> attn_metadata[k_cache_prefix]
+</span></span><span style="display:flex;"><span>slot_mapping <span style="color:#f92672">=</span> metadata<span style="color:#f92672">.</span>slot_mapping
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> <span style="color:#f92672">not</span> skip_k_cache_insert:
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># V3.2 在这里量化当前 K 并写入本层 Indexer paged cache。</span>
+</span></span><span style="display:flex;"><span>    ops<span style="color:#f92672">.</span>indexer_k_quant_and_cache(
+</span></span><span style="display:flex;"><span>        k,
+</span></span><span style="display:flex;"><span>        kv_cache,
+</span></span><span style="display:flex;"><span>        slot_mapping,
+</span></span><span style="display:flex;"><span>        quant_block_size,
+</span></span><span style="display:flex;"><span>        scale_fmt,
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># -1 用于标记当前 batch 尚未产生或无效的 top-k 位置。</span>
+</span></span><span style="display:flex;"><span>topk_indices_buffer[: hidden_states<span style="color:#f92672">.</span>shape[<span style="color:#ae81ff">0</span>]] <span style="color:#f92672">=</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>
+</span></span></code></pre></div><ul>
+<li>Prefill：按 workspace/logits 显存预算切 chunk，gather 分页 K，计算 <code>fp8_fp4_mqa_logits</code>，然后调用 <code>top_k_per_row_prefill</code>。</li>
+<li>Decode：直接对 paged K cache 调用 paged MQA logits，再使用 persistent top-k 或通用 decode top-k。</li>
+<li>speculative decode：必要时 pack 不规则 token 序列，完成 top-k 后再 unpack。</li>
+<li><code>topk_indices_buffer</code> 是算子的可变输出参数，因此结果主要通过原地写入传递。</li>
+</ul>
+<h3 id="indexer-metadata">
+    Indexer metadata<a class="hash-link" href="#indexer-metadata" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#a6e22e">@dataclass</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DeepseekV32IndexerMetadata</span>:
+</span></span><span style="display:flex;"><span>    seq_lens: torch<span style="color:#f92672">.</span>Tensor
+</span></span><span style="display:flex;"><span>    max_seq_len: int
+</span></span><span style="display:flex;"><span>    slot_mapping: torch<span style="color:#f92672">.</span>Tensor
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    num_decodes: int
+</span></span><span style="display:flex;"><span>    num_decode_tokens: int
+</span></span><span style="display:flex;"><span>    num_prefills: int
+</span></span><span style="display:flex;"><span>    num_prefill_tokens: int
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    decode: DeepSeekV32IndexerDecodeMetadata <span style="color:#f92672">|</span> <span style="color:#66d9ef">None</span> <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span>    prefill: DeepseekV32IndexerPrefillMetadata <span style="color:#f92672">|</span> <span style="color:#66d9ef">None</span> <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+</span></span></code></pre></div><ul>
+<li><code>slot_mapping</code> 决定当前 token 的 K 写入分页 cache 的物理位置。</li>
+<li>decode metadata 提供 block table、每个 query 可见的历史长度和 kernel 调度信息。</li>
+<li>prefill metadata 还包含 chunk 规划，避免一次生成完整的超大 logits 矩阵。</li>
+<li>该 metadata 服务的是 Indexer K cache；主 sparse MLA 使用另一套 attention metadata。</li>
+</ul>
+<h3 id="indexcache-配置决定哪些层刷新-top-k">
+    IndexCache 配置：决定哪些层刷新 top-k<a class="hash-link" href="#indexcache-%e9%85%8d%e7%bd%ae%e5%86%b3%e5%ae%9a%e5%93%aa%e4%ba%9b%e5%b1%82%e5%88%b7%e6%96%b0-top-k" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>index_topk_freq <span style="color:#f92672">=</span> getattr(config, <span style="color:#e6db74">&#34;index_topk_freq&#34;</span>, <span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>index_topk_pattern <span style="color:#f92672">=</span> getattr(config, <span style="color:#e6db74">&#34;index_topk_pattern&#34;</span>, <span style="color:#66d9ef">None</span>)
+</span></span><span style="display:flex;"><span>index_skip_topk_offset <span style="color:#f92672">=</span> getattr(config, <span style="color:#e6db74">&#34;index_skip_topk_offset&#34;</span>, <span style="color:#ae81ff">2</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> index_topk_pattern <span style="color:#f92672">is</span> <span style="color:#66d9ef">None</span>:
+</span></span><span style="display:flex;"><span>    skip_topk <span style="color:#f92672">=</span> (
+</span></span><span style="display:flex;"><span>        max(layer_id <span style="color:#f92672">-</span> index_skip_topk_offset <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">0</span>) <span style="color:#f92672">%</span> index_topk_freq <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">elif</span> <span style="color:#ae81ff">0</span> <span style="color:#f92672">&lt;=</span> layer_id <span style="color:#f92672">&lt;</span> len(index_topk_pattern):
+</span></span><span style="display:flex;"><span>    skip_topk <span style="color:#f92672">=</span> index_topk_pattern[layer_id] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;S&#34;</span>
+</span></span></code></pre></div><ul>
+<li><code>index_topk_freq=1</code>：每层都是 Full 层，每层都运行自己的 Indexer。</li>
+<li><code>index_topk_freq=N</code>：按照 offset 和周期选择 Full 层，其余层为 Shared 层。</li>
+<li><code>index_topk_pattern</code>：显式模式；字符 <code>S</code> 表示 Shared，其他位置按 Full 处理。</li>
+<li><code>index_skip_topk_offset</code>：调整周期开始位置，避免最前面的层在没有 producer 的情况下读取未初始化索引。</li>
+</ul>
+<p>创建 attention 层时，backbone Shared 层通常根本不构造 Indexer：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>is_v32 <span style="color:#f92672">and</span> (<span style="color:#f92672">not</span> skip_topk <span style="color:#f92672">or</span> is_mtp_layer):
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>indexer <span style="color:#f92672">=</span> Indexer(<span style="color:#f92672">...</span>)
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># Shared backbone 层没有自己的 Indexer，也没有自己的 Indexer K cache。</span>
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>indexer <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>self<span style="color:#f92672">.</span>mla_attn <span style="color:#f92672">=</span> MultiHeadLatentAttentionWrapper(
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">...</span>,
+</span></span><span style="display:flex;"><span>    indexer<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>indexer,
+</span></span><span style="display:flex;"><span>    topk_indices_buffer<span style="color:#f92672">=</span>topk_indices_buffer,
+</span></span><span style="display:flex;"><span>    skip_topk<span style="color:#f92672">=</span>skip_topk,
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><blockquote>
+<p>因此不能说 Shared 层&quot;复用了 Full 层的 <code>DeepseekV32IndexerCache</code>&quot;。它复用的是 Full 层写入共享 <code>topk_indices_buffer</code> 的 top-k 结果。</p>
+</blockquote>
+<h3 id="模型级共享-topk_indices_buffer">
+    模型级共享 <code>topk_indices_buffer</code><a class="hash-link" href="#%e6%a8%a1%e5%9e%8b%e7%ba%a7%e5%85%b1%e4%ba%ab-topk_indices_buffer" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>self<span style="color:#f92672">.</span>is_v32 <span style="color:#f92672">=</span> hasattr(config, <span style="color:#e6db74">&#34;index_topk&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>is_v32:
+</span></span><span style="display:flex;"><span>    topk_indices_buffer <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>empty(
+</span></span><span style="display:flex;"><span>        vllm_config<span style="color:#f92672">.</span>scheduler_config<span style="color:#f92672">.</span>max_num_batched_tokens,
+</span></span><span style="display:flex;"><span>        config<span style="color:#f92672">.</span>index_topk,
+</span></span><span style="display:flex;"><span>        dtype<span style="color:#f92672">=</span>torch<span style="color:#f92672">.</span>int32,
+</span></span><span style="display:flex;"><span>        device<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>device,
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>    topk_indices_buffer <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 同一个 tensor 被传给所有 decoder layers。</span>
+</span></span><span style="display:flex;"><span>self<span style="color:#f92672">.</span>layers <span style="color:#f92672">=</span> make_layers(
+</span></span><span style="display:flex;"><span>    config<span style="color:#f92672">.</span>num_hidden_layers,
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">lambda</span> prefix: DeepseekV2DecoderLayer(
+</span></span><span style="display:flex;"><span>        vllm_config<span style="color:#f92672">=</span>vllm_config,
+</span></span><span style="display:flex;"><span>        prefix<span style="color:#f92672">=</span>prefix,
+</span></span><span style="display:flex;"><span>        topk_indices_buffer<span style="color:#f92672">=</span>topk_indices_buffer,
+</span></span><span style="display:flex;"><span>    ),
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><ul>
+<li>buffer 形状为 <code>[max_num_batched_tokens, index_topk]</code>，dtype 为 <code>int32</code>。</li>
+<li>它按当前 forward batch 重复使用，不随完整历史长度线性增长。</li>
+<li>它不是 paged cache，也不由 KV cache manager 管理。</li>
+<li>Full 层原地覆盖它；随后 Shared 层读取同一 tensor 中仍保留的索引。</li>
+</ul>
+<h3 id="attention-中的-fullshared-分支">
+    Attention 中的 Full/Shared 分支<a class="hash-link" href="#attention-%e4%b8%ad%e7%9a%84-fullshared-%e5%88%86%e6%94%af" title="Direct link to heading">#</a>
+</h3><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># Full 层：运行 Indexer，更新本层 K cache，并刷新共享 top-k buffer。</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> self<span style="color:#f92672">.</span>indexer <span style="color:#f92672">and</span> self<span style="color:#f92672">.</span>is_sparse <span style="color:#f92672">and</span> <span style="color:#f92672">not</span> self<span style="color:#f92672">.</span>skip_topk:
+</span></span><span style="display:flex;"><span>    self<span style="color:#f92672">.</span>indexer(hidden_states, q_c, positions, self<span style="color:#f92672">.</span>indexer_rope_emb)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Full 和 Shared 层都会运行 sparse MLA。</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Shared 层没有刷新 buffer，因此会消费最近前置 Full 层留下的 top-k。</span>
+</span></span><span style="display:flex;"><span>attn_out <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>mla_attn(
+</span></span><span style="display:flex;"><span>    q,
+</span></span><span style="display:flex;"><span>    kv_c_normed,
+</span></span><span style="display:flex;"><span>    k_pe,
+</span></span><span style="display:flex;"><span>    output_shape<span style="color:#f92672">=</span>(hidden_states<span style="color:#f92672">.</span>shape[<span style="color:#ae81ff">0</span>], self<span style="color:#f92672">.</span>num_heads <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>v_head_dim),
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><p>这里没有发生 top-k tensor 的显式复制。跨层复用依赖：</p>
+<ol>
+<li>所有层持有同一个 <code>topk_indices_buffer</code>。</li>
+<li>transformer 层按顺序执行。</li>
+<li>Full 层先写入。</li>
+<li>Shared 层不运行 Indexer，因此不会覆盖 buffer。</li>
+<li>sparse MLA 从该 buffer 获取候选位置，但仍使用本层自己的主 MLA cache 计算 attention。</li>
+</ol>
+<h2 id="参考">
+    参考<a class="hash-link" href="#%e5%8f%82%e8%80%83" title="Direct link to heading">#</a>
+</h2><ol>
+<li><a href="https://arxiv.org/pdf/2603.12201">DSA: DeepSeek Sparse Attention</a></li>
+<li><a href="https://mp.weixin.qq.com/s/9P55GU1t8LB5N48TAbqMTQ">DeepSeek-V3.2 稀疏注意力技术深度解读</a></li>
+<li><a href="https://github.com/vllm-project/vllm/pull/37735/changes">vLLM PR #37735 — IndexCache 实现</a></li>
+</ol>
+
+      </div>
+    </div>
+  </article>
+</div>
+
+    </main>
+    <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
+      &copy;  Atomage's Blog  2022-2026 
+    </a>
+    <div>
+<div class="ananke-socials">
+  
+    
+    <a href="https://github.com/ZhongsJie" target="_blank" rel="noopener" class="github ananke-social-link link-transition stackoverflow link dib z-999 pt3 pt0-l mr1" title="GitHub link" aria-label="follow on GitHub——Opens in a new window">
+      
+        <span class="icon"><svg style="enable-background:new 0 0 512 512;" version="1.1" viewBox="0 0 512 512"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <path d="M256,32C132.3,32,32,134.8,32,261.7c0,101.5,64.2,187.5,153.2,217.9c11.2,2.1,15.3-5,15.3-11.1   c0-5.5-0.2-19.9-0.3-39.1c-62.3,13.9-75.5-30.8-75.5-30.8c-10.2-26.5-24.9-33.6-24.9-33.6c-20.3-14.3,1.5-14,1.5-14   c22.5,1.6,34.3,23.7,34.3,23.7c20,35.1,52.4,25,65.2,19.1c2-14.8,7.8-25,14.2-30.7c-49.7-5.8-102-25.5-102-113.5   c0-25.1,8.7-45.6,23-61.6c-2.3-5.8-10-29.2,2.2-60.8c0,0,18.8-6.2,61.6,23.5c17.9-5.1,37-7.6,56.1-7.7c19,0.1,38.2,2.6,56.1,7.7   c42.8-29.7,61.5-23.5,61.5-23.5c12.2,31.6,4.5,55,2.2,60.8c14.3,16.1,23,36.6,23,61.6c0,88.2-52.4,107.6-102.3,113.3   c8,7.1,15.2,21.1,15.2,42.5c0,30.7-0.3,55.5-0.3,63c0,6.1,4,13.3,15.4,11C415.9,449.1,480,363.1,480,261.7   C480,134.8,379.7,32,256,32z"/>
+</svg>
+</span>
+      
+<span class="new-window"><svg  height="8px"  style="enable-background:new 0 0 1000 1000;" version="1.1" viewBox="0 0 1000 1000"  xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<path d="M598 128h298v298h-86v-152l-418 418-60-60 418-418h-152v-86zM810 810v-298h86v298c0 46-40 86-86 86h-596c-48 0-86-40-86-86v-596c0-46 38-86 86-86h298v86h-298v596h596z" style="fill-rule:evenodd;clip-rule:evenodd;"/>
+</svg>
+</span></a>
+  
+</div>
+</div>
+    <a href="https://beian.miit.gov.cn/" class="link db f6 pa2 br3 bg-mid-gray white dim w4 tc"> 蜀ICP备2022025742号 </a>
+    
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
+      <script>
+        var doNotTrack = false;
+        if ( true ) {
+          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
+          var doNotTrack = (dnt == "1" || dnt == "yes");
+        }
+        if (!doNotTrack) {
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-HVT9CMYGB1');
+        }
+      </script>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script>
+renderMathInElement(document.body, {
+    delimiters: [
+        {left: "$$", right: "$$", display: true},
+        {left: "\\[", right: "\\]", display: true},
+        {left: "$", right: "$", display: false},
+        {left: "\\(", right: "\\)", display: false}
+    ],
+    throwOnError: false
+});
+</script>
+
+  </body>
+</html>

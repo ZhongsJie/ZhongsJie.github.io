@@ -1,22 +1,22 @@
 <!DOCTYPE html>
 <html lang="zh-cn"ZgotmplZ>
-  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
     <title>Atomage&#39;s Blog</title>
     <meta name="viewport" content="width=device-width,minimum-scale=1">
     <meta name="description" content="分界">
-    <meta name="generator" content="Hugo 0.163.0">
+    <meta name="generator" content="Hugo 0.163.3">
     
     
     
     
-      <meta name="robots" content="noindex, nofollow">
+      <meta name="robots" content="index, follow">
     
 
     
-<link rel="stylesheet" href="./ananke/css/main.min.css" >
+<link rel="stylesheet" href="./ananke/css/main.min.65a4ba9d742b05c115846d8e06cf4714294b7ebf3dd26b492a84a9e3cc66923d.css" >
 
 
 
@@ -37,7 +37,7 @@
       
     
     
-    <meta property="og:url" content="http://localhost:1313/">
+    <meta property="og:url" content="https://blogs.atomage.cn/">
 	<meta property="og:site_name" content="Atomage&#39;s Blog">
 	<meta property="og:title" content="Atomage&#39;s Blog">
 	<meta property="og:description" content="分界">
@@ -46,12 +46,28 @@
 
 	<meta itemprop="name" content="Atomage&#39;s Blog">
 	<meta itemprop="description" content="分界">
-	<meta itemprop="datePublished" content="2026-06-16T10:10:40+08:00">
-	<meta itemprop="dateModified" content="2026-06-16T10:10:40+08:00">
+	<meta itemprop="datePublished" content="2026-06-23T09:05:11+08:00">
+	<meta itemprop="dateModified" content="2026-06-23T09:05:11+08:00">
 	<meta name="twitter:card" content="summary">
 	<meta name="twitter:title" content="Atomage&#39;s Blog">
 	<meta name="twitter:description" content="分界">
 
+      
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
+      <script>
+        var doNotTrack = false;
+        if ( true ) {
+          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
+          var doNotTrack = (dnt == "1" || dnt == "yes");
+        }
+        if (!doNotTrack) {
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-HVT9CMYGB1');
+        }
+      </script>
+    
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <style>
 .toc-sidebar {
@@ -96,7 +112,7 @@ pre code {
 
   </head>
 
-  <body class="ma0 avenir bg-near-white">
+  <body class="ma0 avenir bg-near-white production">
 
     
 
@@ -194,6 +210,45 @@ pre code {
 
       <section class="w-100 mw8">
         
+        
+          <div class="relative w-100 mb4">
+            
+<article class="bb b--black-10">
+  <div class="db pv4 ph3 ph0-l no-underline dark-gray">
+    <div class="flex flex-column flex-row-ns">
+      
+      <div class="blah w-100">
+        <h1 class="f3 fw1 athelas mt0 lh-title">
+          <a href="./posts/2026-06-23-indexcache/" class="color-inherit dim link">
+            IndexCache：DeepSeek 稀疏注意力中的跨层索引复用
+            </a>
+        </h1>
+        <div class="f6 f5-l lh-copy nested-copy-line-height nested-links">
+          <p><img src="./images/2026-06/indexcache-layer-similarity.png" alt=""></p>
+<h2 id="技术背景">
+    技术背景<a class="hash-link" href="#%e6%8a%80%e6%9c%af%e8%83%8c%e6%99%af" title="Direct link to heading">#</a>
+</h2><h3 id="mla-已经解决了-kv-cache-存储问题">
+    MLA 已经解决了 KV Cache 存储问题<a class="hash-link" href="#mla-%e5%b7%b2%e7%bb%8f%e8%a7%a3%e5%86%b3%e4%ba%86-kv-cache-%e5%ad%98%e5%82%a8%e9%97%ae%e9%a2%98" title="Direct link to heading">#</a>
+</h3><p>DeepSeek-V2 提出的 <strong>MLA（Multi-head Latent Attention）</strong> 将 KV Cache 压缩到了极低的水平：</p>
+<ul>
+<li>每 token 仅缓存 <strong>576 个元素</strong>（512 维压缩隐向量 + 64 维 RoPE 分量）</li>
+<li>相当于 MHA 的 <strong>1.76%</strong></li>
+<li>128K 上下文下，FP8 KV Cache 仅需 <strong>8.72 GB</strong>（对比 Llama-70B 的 343 GB）</li>
+</ul>
+<p>MLA 的压缩技巧在于：K 和 V 共享一个低秩隐向量 $c_t^{KV} \in \mathbb{R}^{512}$，推理时通过矩阵吸收技巧避免显式恢复高维 K/V。但是，MLA 仍然是<strong>全注意力</strong>——每个 query token 仍然要计算与所有历史 token 的注意力分数。当上下文长度增长到 128K 以上时，注意力计算量本身成为新瓶颈。</p>
+<h3 id="从全注意力到稀疏注意力">
+    从全注意力到稀疏注意力<a class="hash-link" href="#%e4%bb%8e%e5%85%a8%e6%b3%a8%e6%84%8f%e5%8a%9b%e5%88%b0%e7%a8%80%e7%96%8f%e6%b3%a8%e6%84%8f%e5%8a%9b" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>DeepSeek-V3.2 引入的 <strong>DSA（DeepSeek Sparse Attention）</strong> 直接解决计算瓶颈：不再计算所有 token 的注意力，而是只选择 Top-K 个最重要的历史 token。闪电索引器 <strong>(Lightning Indexer）</strong> 是一个轻量级的注意力模块，为每个 query 快速计算与所有 key 的粗粒度相关性分数，然后通过 <strong>Top-K Selector</strong> 选出 top-k 个最相关的 token 索引。</p>
+        </div>
+          <a href="./posts/2026-06-23-indexcache/" class="ba b--moon-gray bg-light-gray br2 color-inherit dib f7 hover-bg-moon-gray link mt2 ph2 pv1">read more</a>
+        
+      </div>
+    </div>
+  </div>
+</article>
+
+          </div>
         
           <div class="relative w-100 mb4">
             
@@ -659,73 +714,18 @@ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$</li>
 
           </div>
         
-          <div class="relative w-100 mb4">
-            
-<article class="bb b--black-10">
-  <div class="db pv4 ph3 ph0-l no-underline dark-gray">
-    <div class="flex flex-column flex-row-ns">
-      
-      <div class="blah w-100">
-        <h1 class="f3 fw1 athelas mt0 lh-title">
-          <a href="./posts/2023-07-19-go-memory-model/" class="color-inherit dim link">
-            Go 内存模型与分配机制
-            </a>
-        </h1>
-        <div class="f6 f5-l lh-copy nested-copy-line-height nested-links">
-          <blockquote>
-<p>Go内存模型指定了一个goroutine中变量的读取条件，可以保证观察不同goroutine中对同一变量的写入产生的值。</p>
-</blockquote>
-<h2 id="虚拟内存">
-    虚拟内存<a class="hash-link" href="#%e8%99%9a%e6%8b%9f%e5%86%85%e5%ad%98" title="Direct link to heading">#</a>
-</h2><blockquote>
-<p>虚拟内存技术是操作系统实现的一种高效的物理内存管理方式</p>
-</blockquote>
-<p><img src="./images/2023-07/%E8%99%9A%E6%8B%9F%E5%9C%B0%E5%9D%80.png" alt="image-20200720222628264"></p>
-<ul>
-<li>虚拟内存通过<strong>页表</strong>映射到物理内存上，页表记录是否在物理内存上（<strong>有效位</strong>），以及物理内存页的地址</li>
-<li>操作系统为每个进程提供了一个独立的页表，因此也就是一个独立的虚拟空间地址，多个虚拟页面可以映射到同一个共享物理页面上。</li>
-<li><strong>地址翻译</strong>：一个N元素的虚拟地址空间的元素和一个M元素的物理地址空间中元素之间的映射</li>
-<li>虚拟内存：利用磁盘空间<strong>虚拟出一块逻辑内存</strong>，用作虚拟内存的磁盘空间被称为交换空间</li>
-</ul>
-<ol>
-<li>操作系统内存管理中，一个重要概念虚拟内存:
-<ul>
-<li>扩大地址空间</li>
-<li>内存保护</li>
-<li>公平内存分配</li>
-<li>当进程通信时，可采用虚存共享的方式实现</li>
-<li>不需要在实际物理内存的连续空间，**可以利用碎片</li>
-</ul>
-</li>
-<li>虚拟内存的<strong>代价</strong>：
-<ul>
-<li>管理需要建立很多数据结构，占用额外的内存</li>
-<li>虚拟地址到物理地址的转换，增加了指令的执行时间</li>
-<li>页面的换入换出需要磁盘I/O</li>
-<li>一页中只有部分数据，会浪费内存</li>
-</ul>
-</li>
-</ol>
-<h2 id="go内存模型">
-    Go内存模型<a class="hash-link" href="#go%e5%86%85%e5%ad%98%e6%a8%a1%e5%9e%8b" title="Direct link to heading">#</a>
-</h2><blockquote>
-<p>参考<a href="https://github.com/google/tcmalloc/blob/master/docs/design.md">tcmalloc</a>设计，「修改由多个goroutine同时访问的数据的程序必须序列化这种访问。 要序列化访问，请使用channel操作或其他同步原语（sync和sync/atomic）保护数据。 别自作聪明。」</p>
-        </div>
-          <a href="./posts/2023-07-19-go-memory-model/" class="ba b--moon-gray bg-light-gray br2 color-inherit dib f7 hover-bg-moon-gray link mt2 ph2 pv1">read more</a>
-        
-      </div>
-    </div>
-  </div>
-</article>
-
-          </div>
-        
       </section>
 
       
       <section class="w-100">
         <h1 class="f3">More</h1>
         
+        
+          <h2 class="f5 fw4 mb4 dib mr3">
+            <a href="./posts/2023-07-19-go-memory-model/" class="link black dim">
+              Go 内存模型与分配机制
+            </a>
+          </h2>
         
           <h2 class="f5 fw4 mb4 dib mr3">
             <a href="./posts/2023-07-10-tcp-ip-protocol/" class="link black dim">
@@ -745,12 +745,6 @@ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$</li>
             </a>
           </h2>
         
-          <h2 class="f5 fw4 mb4 dib mr3">
-            <a href="./posts/2022-12-09-nginx-learning/" class="link black dim">
-              Nginx指南
-            </a>
-          </h2>
-        
 
         
         
@@ -765,7 +759,7 @@ $$u_𝑡 = 𝑊^𝑂 [o_{𝑡,1}; o_{𝑡,2}; ...; o_{𝑡,𝑛_ℎ} ]$$</li>
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
       &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>

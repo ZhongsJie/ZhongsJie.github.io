@@ -1,22 +1,22 @@
 <!DOCTYPE html>
 <html lang="zh-cn"ZgotmplZ>
-  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     
     <title>Atomage&#39;s Blog</title>
     <meta name="viewport" content="width=device-width,minimum-scale=1">
     <meta name="description" content="分界">
-    <meta name="generator" content="Hugo 0.163.0">
+    <meta name="generator" content="Hugo 0.163.3">
     
     
     
     
-      <meta name="robots" content="noindex, nofollow">
+      <meta name="robots" content="index, follow">
     
 
     
-<link rel="stylesheet" href="../../ananke/css/main.min.css" >
+<link rel="stylesheet" href="../../ananke/css/main.min.65a4ba9d742b05c115846d8e06cf4714294b7ebf3dd26b492a84a9e3cc66923d.css" >
 
 
 
@@ -37,7 +37,7 @@
       
     
     
-    <meta property="og:url" content="http://localhost:1313/categories/ai/">
+    <meta property="og:url" content="https://blogs.atomage.cn/categories/ai/">
 	<meta property="og:site_name" content="Atomage&#39;s Blog">
 	<meta property="og:title" content="AI">
 	<meta property="og:description" content="分界">
@@ -46,12 +46,28 @@
 
 	<meta itemprop="name" content="AI">
 	<meta itemprop="description" content="分界">
-	<meta itemprop="datePublished" content="2026-06-16T10:10:40+08:00">
-	<meta itemprop="dateModified" content="2026-06-16T10:10:40+08:00">
+	<meta itemprop="datePublished" content="2026-06-23T09:05:11+08:00">
+	<meta itemprop="dateModified" content="2026-06-23T09:05:11+08:00">
 	<meta name="twitter:card" content="summary">
 	<meta name="twitter:title" content="AI">
 	<meta name="twitter:description" content="分界">
 
+      
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HVT9CMYGB1"></script>
+      <script>
+        var doNotTrack = false;
+        if ( true ) {
+          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
+          var doNotTrack = (dnt == "1" || dnt == "yes");
+        }
+        if (!doNotTrack) {
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-HVT9CMYGB1');
+        }
+      </script>
+    
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <style>
 .toc-sidebar {
@@ -96,7 +112,7 @@ pre code {
 
   </head>
 
-  <body class="ma0 avenir bg-near-white">
+  <body class="ma0 avenir bg-near-white production">
 
     
 
@@ -182,6 +198,38 @@ pre code {
   <div class="bg-white mb3 pa4 gray overflow-hidden">
     <span class="f6 db">📎Posts</span>
     <h1 class="f3 near-black">
+      <a href="../../posts/2026-06-23-indexcache/" class="link black dim">
+        IndexCache：DeepSeek 稀疏注意力中的跨层索引复用
+      </a>
+    </h1>
+    <div class="nested-links f5 lh-copy nested-copy-line-height" style="overflow:hidden; height: 16rem;">
+      <p><img src="../../images/2026-06/indexcache-layer-similarity.png" alt=""></p>
+<h2 id="技术背景">
+    技术背景<a class="hash-link" href="#%e6%8a%80%e6%9c%af%e8%83%8c%e6%99%af" title="Direct link to heading">#</a>
+</h2><h3 id="mla-已经解决了-kv-cache-存储问题">
+    MLA 已经解决了 KV Cache 存储问题<a class="hash-link" href="#mla-%e5%b7%b2%e7%bb%8f%e8%a7%a3%e5%86%b3%e4%ba%86-kv-cache-%e5%ad%98%e5%82%a8%e9%97%ae%e9%a2%98" title="Direct link to heading">#</a>
+</h3><p>DeepSeek-V2 提出的 <strong>MLA（Multi-head Latent Attention）</strong> 将 KV Cache 压缩到了极低的水平：</p>
+<ul>
+<li>每 token 仅缓存 <strong>576 个元素</strong>（512 维压缩隐向量 + 64 维 RoPE 分量）</li>
+<li>相当于 MHA 的 <strong>1.76%</strong></li>
+<li>128K 上下文下，FP8 KV Cache 仅需 <strong>8.72 GB</strong>（对比 Llama-70B 的 343 GB）</li>
+</ul>
+<p>MLA 的压缩技巧在于：K 和 V 共享一个低秩隐向量 $c_t^{KV} \in \mathbb{R}^{512}$，推理时通过矩阵吸收技巧避免显式恢复高维 K/V。但是，MLA 仍然是<strong>全注意力</strong>——每个 query token 仍然要计算与所有历史 token 的注意力分数。当上下文长度增长到 128K 以上时，注意力计算量本身成为新瓶颈。</p>
+<h3 id="从全注意力到稀疏注意力">
+    从全注意力到稀疏注意力<a class="hash-link" href="#%e4%bb%8e%e5%85%a8%e6%b3%a8%e6%84%8f%e5%8a%9b%e5%88%b0%e7%a8%80%e7%96%8f%e6%b3%a8%e6%84%8f%e5%8a%9b" title="Direct link to heading">#</a>
+</h3><blockquote>
+<p>DeepSeek-V3.2 引入的 <strong>DSA（DeepSeek Sparse Attention）</strong> 直接解决计算瓶颈：不再计算所有 token 的注意力，而是只选择 Top-K 个最重要的历史 token。闪电索引器 <strong>(Lightning Indexer）</strong> 是一个轻量级的注意力模块，为每个 query 快速计算与所有 key 的粗粒度相关性分数，然后通过 <strong>Top-K Selector</strong> 选出 top-k 个最相关的 token 索引。</p>
+    </div>
+  </div>
+</div>
+
+        </div>
+      
+        <div class="relative w-100  mb4 bg-white">
+          <div class="relative w-100 mb4 bg-white nested-copy-line-height">
+  <div class="bg-white mb3 pa4 gray overflow-hidden">
+    <span class="f6 db">📎Posts</span>
+    <h1 class="f3 near-black">
       <a href="../../posts/2026-06-16-dsa-deepseek-sparse-attention/" class="link black dim">
         DSA(Deepseek Sparse Attention)
       </a>
@@ -203,7 +251,7 @@ $$o_i = \sum_{j=1}^{n} \alpha_{ij} \cdot v_j, \quad \alpha_{ij} = \operatorname{
 <li><strong>内容相关性</strong>：语义相关的 token 即使距离远也需要交互</li>
 </ul>
 <p>稀疏注意力方法试图在信息完整性和计算效率之间寻找最优平衡。
-<img src="../../images/2026-06/Pasted%20image%2020260615100100.png" alt=""></p>
+<img src="../../images/2026-06/Pasted-image-20260615100100.png" alt=""></p>
     </div>
   </div>
 </div>
@@ -216,7 +264,7 @@ $$o_i = \sum_{j=1}^{n} \alpha_{ij} \cdot v_j, \quad \alpha_{ij} = \operatorname{
     </main>
     <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
   <div class="flex justify-between">
-    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/">
+    <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://blogs.atomage.cn/">
       &copy;  Atomage's Blog  2022-2026 
     </a>
     <div>
